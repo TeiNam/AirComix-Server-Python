@@ -34,6 +34,7 @@ dependencies = [
     "rarfile>=4.1",
     "python-multipart>=0.0.6",
     "chardet>=5.2.0",
+    "watchdog>=3.0.0",
 ]
 
 [project.optional-dependencies]

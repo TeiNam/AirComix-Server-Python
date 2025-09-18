@@ -3,9 +3,13 @@
 from .filesystem import FileSystemService
 from .archive import ArchiveService
 from .image import ImageService
+from .thumbnail import ThumbnailService
+from .file_watcher import FileWatcherService
 
 __all__ = [
     "FileSystemService",
     "ArchiveService", 
-    "ImageService"
+    "ImageService",
+    "ThumbnailService",
+    "FileWatcherService"
 ]

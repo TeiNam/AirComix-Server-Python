@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     
     # 파일 필터링 설정
     hidden_files: List[str] = Field(
-        default=[".", "..", "@eaDir", "Thumbs.db", ".DS_Store"],
+        default=[".", "..", "@eaDir", "Thumbs.db", ".DS_Store", ".thumbnails"],
         description="숨김 처리할 파일명 목록"
     )
     hidden_patterns: List[str] = Field(
@@ -114,12 +114,9 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             v = Path(v)
         
-        # 디렉토리가 존재하지 않으면 생성 시도
+        # 디렉토리 존재 여부만 확인 (생성하지 않음)
         if not v.exists():
-            try:
-                v.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                raise ValueError(f"manga 디렉토리를 생성할 수 없습니다: {e}")
+            raise ValueError(f"manga 디렉토리가 존재하지 않습니다: {v}")
         
         if not v.is_dir():
             raise ValueError(f"manga_directory는 디렉토리여야 합니다: {v}")

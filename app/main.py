@@ -15,6 +15,7 @@ from app.api.routes import router
 from app.models.config import settings
 from app.utils.logging import get_logger, setup_logging
 from app.exception_handlers import register_exception_handlers
+from app.services import FileWatcherService, ThumbnailService, ArchiveService
 
 
 @asynccontextmanager
@@ -28,10 +29,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"서버 포트: {settings.server_port}")
     logger.info(f"디버그 모드: {settings.debug_mode}")
     
+    # 파일 감시 서비스 시작
+    archive_service = ArchiveService()
+    thumbnail_service = ThumbnailService(archive_service)
+    file_watcher = FileWatcherService(thumbnail_service)
+    
+    await file_watcher.start_watching()
+    logger.info("파일 시스템 감시 서비스 시작됨")
+    
+    # 애플리케이션에 서비스 저장 (나중에 접근 가능하도록)
+    app.state.file_watcher = file_watcher
+    app.state.thumbnail_service = thumbnail_service
+    
     yield
     
     # 종료 시 정리
     logger.info("Comix Server 종료 중...")
+    await file_watcher.stop_watching()
+    logger.info("파일 시스템 감시 서비스 중지됨")
 
 
 def create_app() -> FastAPI:

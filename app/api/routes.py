@@ -1,5 +1,6 @@
 """FastAPI 라우터 및 엔드포인트 정의"""
 
+import io
 from pathlib import Path
 from typing import Union
 from fastapi import APIRouter, HTTPException
@@ -18,6 +19,10 @@ router = APIRouter()
 filesystem_service = FileSystemService(Path(settings.manga_directory))
 archive_service = ArchiveService()
 image_service = ImageService(settings, archive_service)
+
+# 썸네일 서비스 추가
+from app.services.thumbnail import ThumbnailService
+thumbnail_service = ThumbnailService(archive_service)
 
 # 만화 요청 핸들러 생성
 manga_handler = MangaRequestHandler(
@@ -108,6 +113,168 @@ async def health_check():
     except Exception as e:
         logger.error(f"헬스 체크 중 오류: {e}")
         raise HTTPException(status_code=503, detail="Service unavailable")
+
+
+@router.get("/thumbnail/{path:path}")
+async def get_thumbnail(path: str):
+    """썸네일 요청 처리 엔드포인트
+    
+    아카이브 파일이나 폴더의 썸네일을 반환합니다.
+    - 아카이브 파일: 첫 번째 이미지의 썸네일
+    - 폴더: 첫 번째 아카이브의 첫 번째 이미지 썸네일
+    - manga 루트 폴더: aircomix.png 썸네일
+    
+    Args:
+        path: 썸네일을 요청할 경로
+        
+    Returns:
+        JPEG 형식의 썸네일 이미지
+    """
+    try:
+        from urllib.parse import unquote
+        from app.utils.path import PathUtils
+        
+        # URL 디코딩
+        decoded_path = unquote(path)
+        logger.debug(f"썸네일 요청: {decoded_path}")
+        
+        # 경로 검증 및 정규화
+        manga_root = Path(settings.manga_directory)
+        target_path = PathUtils.resolve_safe_path(manga_root, decoded_path)
+        
+        if not target_path.exists():
+            raise HTTPException(status_code=404, detail="파일 또는 폴더를 찾을 수 없습니다")
+        
+        # 썸네일 생성 또는 조회
+        thumbnail_data = await thumbnail_service.get_or_create_thumbnail(target_path)
+        
+        if not thumbnail_data:
+            raise HTTPException(status_code=404, detail="썸네일을 생성할 수 없습니다")
+        
+        # JPEG 이미지로 응답
+        return StreamingResponse(
+            io.BytesIO(thumbnail_data),
+            media_type="image/jpeg",
+            headers={
+                "Content-Length": str(len(thumbnail_data)),
+                "Cache-Control": "public, max-age=3600"  # 1시간 캐시
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"썸네일 처리 중 오류: {path}, {e}")
+        raise HTTPException(status_code=500, detail="썸네일 처리 실패")
+
+
+@router.get("/admin/thumbnail/info")
+async def get_thumbnail_cache_info():
+    """썸네일 캐시 정보 조회 엔드포인트
+    
+    현재 썸네일 캐시의 상태 정보를 반환합니다.
+    
+    Returns:
+        썸네일 캐시 정보 (JSON)
+    """
+    try:
+        cache_info = await thumbnail_service.get_cache_info()
+        return cache_info
+    except Exception as e:
+        logger.error(f"썸네일 캐시 정보 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail="캐시 정보 조회 실패")
+
+
+@router.post("/admin/thumbnail/cleanup")
+async def cleanup_thumbnail_cache():
+    """고아 썸네일 정리 엔드포인트
+    
+    원본 파일이 삭제된 썸네일들을 정리합니다.
+    
+    Returns:
+        정리 결과 정보
+    """
+    try:
+        deleted_count = await thumbnail_service.cleanup_orphaned_thumbnails()
+        return {
+            "message": "썸네일 정리 완료",
+            "deleted_count": deleted_count
+        }
+    except Exception as e:
+        logger.error(f"썸네일 정리 실패: {e}")
+        raise HTTPException(status_code=500, detail="썸네일 정리 실패")
+
+
+@router.delete("/admin/thumbnail/cache")
+async def clear_thumbnail_cache():
+    """썸네일 캐시 전체 삭제 엔드포인트
+    
+    모든 썸네일 캐시를 삭제합니다.
+    
+    Returns:
+        삭제 결과 정보
+    """
+    try:
+        await thumbnail_service.clear_cache()
+        return {"message": "썸네일 캐시 삭제 완료"}
+    except Exception as e:
+        logger.error(f"썸네일 캐시 삭제 실패: {e}")
+        raise HTTPException(status_code=500, detail="썸네일 캐시 삭제 실패")
+
+
+@router.get("/{path}.thm")
+async def get_thumbnail_by_thm_extension(path: str):
+    """AirComix 앱 호환 썸네일 엔드포인트 (.thm 확장자)
+    
+    AirComix 앱이 사용하는 .thm 확장자 썸네일 요청을 처리합니다.
+    
+    Args:
+        path: 썸네일을 요청할 경로 (확장자 제외)
+        
+    Returns:
+        JPEG 형식의 썸네일 이미지
+    """
+    try:
+        from urllib.parse import unquote
+        from app.utils.path import PathUtils
+        
+        # URL 디코딩
+        decoded_path = unquote(path)
+        logger.debug(f"썸네일 요청 (.thm): {decoded_path}")
+        
+        # 경로 검증 및 정규화
+        manga_root = Path(settings.manga_directory)
+        
+        # 빈 경로이거나 "manga"인 경우 루트 폴더 썸네일
+        if not decoded_path or decoded_path == "manga":
+            target_path = manga_root
+        else:
+            target_path = PathUtils.resolve_safe_path(manga_root, decoded_path)
+        
+        if not target_path.exists():
+            raise HTTPException(status_code=404, detail="파일 또는 폴더를 찾을 수 없습니다")
+        
+        # 썸네일 생성 또는 조회
+        thumbnail_data = await thumbnail_service.get_or_create_thumbnail(target_path)
+        
+        if not thumbnail_data:
+            raise HTTPException(status_code=404, detail="썸네일을 생성할 수 없습니다")
+        
+        # JPEG 이미지로 응답
+        return StreamingResponse(
+            io.BytesIO(thumbnail_data),
+            media_type="image/jpeg",
+            headers={
+                "Content-Length": str(len(thumbnail_data)),
+                "Cache-Control": "public, max-age=3600"  # 1시간 캐시
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"썸네일 처리 중 오류 (.thm): {path}, {e}")
+        raise HTTPException(status_code=500, detail="썸네일 처리 실패")
 
 
 @router.get("/manga/{path:path}", response_model=None)

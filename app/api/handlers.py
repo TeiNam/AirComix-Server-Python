@@ -12,6 +12,7 @@ from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from app.models.config import Settings
 from app.services import FileSystemService, ArchiveService, ImageService
+from app.services.thumbnail import ThumbnailService
 from app.utils.logging import get_logger
 from app.utils.path import PathUtils
 from app.exceptions import (
@@ -36,6 +37,7 @@ class MangaRequestHandler:
         self.filesystem_service = filesystem_service
         self.archive_service = archive_service
         self.image_service = image_service
+        self.thumbnail_service = ThumbnailService(archive_service)
         self.manga_root = Path(settings.manga_directory)
     
     async def handle_request(self, path: str) -> Union[PlainTextResponse, StreamingResponse]:
@@ -58,6 +60,10 @@ class MangaRequestHandler:
             # 경로 검증 및 정규화
             normalized_path = self._validate_and_normalize_path(decoded_path)
             full_path = self.manga_root / normalized_path
+            
+            # 썸네일 요청 처리
+            if decoded_path.endswith('.thm'):
+                return await self._handle_thumbnail_request(decoded_path)
             
             # 경로 타입에 따른 처리 분기
             if self._is_archive_image_request(decoded_path):
@@ -227,3 +233,71 @@ class MangaRequestHandler:
         except Exception as e:
             logger.error(f"아카이브 목록 조회 중 오류: {archive_path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="아카이브 목록 조회 오류")
+    
+    async def _handle_thumbnail_request(self, path: str) -> StreamingResponse:
+        """썸네일 요청을 처리합니다
+        
+        Args:
+            path: 썸네일 요청 경로 (예: "archive_name.zip.thm" 또는 "folder_name.thm")
+            
+        Returns:
+            썸네일 이미지 스트리밍 응답
+        """
+        try:
+            # .thm 확장자 제거하여 원본 파일/폴더명 추출
+            target_filename = path[:-4]  # .thm 제거
+            logger.info(f"썸네일 요청: {target_filename}")
+            
+            # 경로 검증 및 정규화
+            normalized_path = self._validate_and_normalize_path(target_filename)
+            target_path = self.manga_root / normalized_path
+            
+            # 파일/폴더 존재 확인
+            if not target_path.exists():
+                logger.warning(f"썸네일 대상이 존재하지 않음: {target_path}")
+                raise FileNotFoundError(str(target_path))
+            
+            # 아카이브 파일이거나 폴더인지 확인
+            if target_path.is_file():
+                if not self.archive_service.is_archive_file(target_path.name):
+                    logger.warning(f"썸네일 요청 대상이 아카이브가 아님: {target_path}")
+                    raise UnsupportedFileTypeError(str(target_path))
+            elif not target_path.is_dir():
+                logger.warning(f"썸네일 요청 대상이 파일도 폴더도 아님: {target_path}")
+                raise UnsupportedFileTypeError(str(target_path))
+            
+            # 썸네일 생성 또는 조회
+            thumbnail_data = await self.thumbnail_service.get_or_create_thumbnail(target_path)
+            
+            if not thumbnail_data:
+                logger.warning(f"썸네일 생성 실패: {target_path}")
+                raise FileNotFoundError(f"썸네일을 생성할 수 없습니다: {target_filename}")
+            
+            # 썸네일 스트리밍 응답 생성
+            async def thumbnail_streamer():
+                chunk_size = 8192
+                for i in range(0, len(thumbnail_data), chunk_size):
+                    yield thumbnail_data[i:i + chunk_size]
+            
+            headers = {
+                'Content-Type': 'image/jpeg',
+                'Content-Length': str(len(thumbnail_data)),
+                'Cache-Control': 'public, max-age=86400',  # 24시간 캐시
+                'Accept-Ranges': 'bytes'
+            }
+            
+            logger.info(f"썸네일 응답: {target_filename}, 크기: {len(thumbnail_data)} bytes")
+            
+            return StreamingResponse(
+                thumbnail_streamer(),
+                media_type='image/jpeg',
+                headers=headers
+            )
+            
+        except (FileNotFoundError, AccessDeniedError, UnsupportedFileTypeError, 
+                PathTraversalError) as e:
+            # 커스텀 예외는 그대로 재발생
+            raise e
+        except Exception as e:
+            logger.error(f"썸네일 요청 처리 중 오류: {path}, 오류: {e}")
+            raise HTTPException(status_code=500, detail="썸네일 처리 오류")
