@@ -21,8 +21,8 @@ AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python �
 
 ```bash
 # 저장소 클론
-git clone https://github.com/comix-server/comix-server-python.git
-cd comix-server-python
+git clone https://github.com/TeiNam/AirComix-Server-Python.git
+cd AirComix-Server-Python
 
 # Docker 디렉토리로 이동
 cd docker
@@ -137,5 +137,5 @@ comix-server-python/
 
 ## 📞 지원
 
-- 🐛 버그 리포트: [GitHub Issues](https://github.com/comix-server/comix-server-python/issues)
-- 💡 기능 요청: [GitHub Discussions](https://github.com/comix-server/comix-server-python/discussions)
+- 🐛 버그 리포트: [GitHub Issues](https://github.com/TeiNam/AirComix-Server-Python/issues)
+- 💡 기능 요청: [GitHub Discussions](https://github.com/TeiNam/AirComix-Server-Python/discussions)
