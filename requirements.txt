@@ -1,0 +1,26 @@
+# Comix Server Python Port - Production Dependencies
+# Generated from pyproject.toml
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Data Validation and Settings
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# File Operations
+aiofiles>=23.2.1
+python-multipart>=0.0.6
+
+# Image Processing
+pillow>=10.1.0
+
+# Archive Support
+rarfile>=4.1
+
+# Character Encoding
+chardet>=5.2.0
+
+# File System Monitoring
+watchdog>=3.0.0
