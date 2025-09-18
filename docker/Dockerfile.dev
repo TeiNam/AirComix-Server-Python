@@ -1,0 +1,39 @@
+# Development Dockerfile for Comix Server Python Port
+FROM python:3.11-slim as development
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    unrar-free \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create application directory
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY pyproject.toml ./
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -e ".[dev]"
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN groupadd -r comix && useradd -r -g comix comix && \
+    chown -R comix:comix /app
+
+# Switch to non-root user
+USER comix
+
+# Expose ports
+EXPOSE 31257 5678
+
+# Default development command
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257", "--reload"]

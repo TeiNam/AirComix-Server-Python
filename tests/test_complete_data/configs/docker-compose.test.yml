@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  comix-server:
+    build: .
+    ports:
+      - "31257:31257"
+    volumes:
+      - ./test_manga:/manga:ro
+    environment:
+      - COMIX_MANGA_DIRECTORY=/manga
+      - COMIX_DEBUG_MODE=false
+      - COMIX_LOG_LEVEL=INFO
+    restart: unless-stopped
+
+  comix-server-dev:
+    build: .
+    ports:
+      - "31258:31257"
+    volumes:
+      - ./test_manga:/manga:ro
+      - .:/app
+    environment:
+      - COMIX_MANGA_DIRECTORY=/manga
+      - COMIX_DEBUG_MODE=true
+      - COMIX_LOG_LEVEL=DEBUG
+    command: uvicorn app.main:app --host 0.0.0.0 --port 31257 --reload

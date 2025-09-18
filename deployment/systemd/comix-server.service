@@ -1,0 +1,48 @@
+[Unit]
+Description=Comix Server - Comic Book Streaming Server
+Documentation=https://github.com/comix-server/comix-server-python
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+User=comix
+Group=comix
+WorkingDirectory=/opt/comix-server
+Environment=PATH=/opt/comix-server/.venv/bin
+Environment=COMIX_MANGA_DIRECTORY=/var/lib/comix/manga
+Environment=COMIX_SERVER_HOST=0.0.0.0
+Environment=COMIX_SERVER_PORT=31257
+Environment=COMIX_DEBUG_MODE=false
+Environment=COMIX_LOG_LEVEL=INFO
+EnvironmentFile=-/etc/comix-server/comix-server.env
+ExecStart=/opt/comix-server/.venv/bin/gunicorn app.main:create_app --config gunicorn.conf.py --factory
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=10
+
+# 보안 설정
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/comix /var/log/comix-server /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# 리소스 제한
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,51 @@
+# Development Docker Compose Configuration
+# Use this for development with hot-reload and debugging
+version: '3.8'
+
+services:
+  comix-server-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+      target: development
+    container_name: comix-server-dev
+    restart: "no"
+    
+    # Port mapping
+    ports:
+      - "${COMIX_SERVER_PORT:-31257}:31257"
+      - "5678:5678"  # Debug port
+    
+    # Volume mounts for development
+    volumes:
+      # Mount source code for hot-reload
+      - "../app:/app/app:rw"
+      - "../tests:/app/tests:rw"
+      - "../pyproject.toml:/app/pyproject.toml:ro"
+      
+      # Mount manga collection
+      - "${MANGA_DIRECTORY:-../test_sample_data}:/manga:ro"
+      
+      # Mount test data
+      - "../test_sample_data:/app/test_data:ro"
+    
+    # Environment variables for development
+    environment:
+      - COMIX_MANGA_DIRECTORY=/manga
+      - COMIX_SERVER_HOST=0.0.0.0
+      - COMIX_SERVER_PORT=31257
+      - COMIX_DEBUG_MODE=true
+      - COMIX_LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    
+    # Development command with hot-reload
+    command: ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257", "--reload", "--log-level", "debug"]
+    
+    # Networks
+    networks:
+      - comix-dev-network
+
+networks:
+  comix-dev-network:
+    driver: bridge
+    name: comix-dev-network
