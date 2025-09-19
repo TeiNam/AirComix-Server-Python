@@ -50,7 +50,7 @@ docker run -d \
 
 ## 🔐 인증 설정 (선택사항)
 
-HTTP Basic Authentication을 사용할 수 있습니다:
+.htaccess 방식의 패스워드 인증을 사용할 수 있습니다:
 
 ```bash
 docker run -d \
@@ -59,7 +59,6 @@ docker run -d \
   -v /path/to/your/manga:/comix \
   -e MANGA_DIRECTORY=/comix \
   -e ENABLE_AUTH=true \
-  -e AUTH_USERNAME=your_username \
   -e AUTH_PASSWORD=your_password \
   aircomix/aircomix-server:latest
 ```
