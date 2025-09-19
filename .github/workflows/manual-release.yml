@@ -1,0 +1,138 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '릴리스 버전 (예: v1.2.3)'
+        required: true
+        type: string
+      release_type:
+        description: '릴리스 타입'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - release
+        - prerelease
+        - hotfix
+      changelog:
+        description: '릴리스 노트 (선택사항)'
+        required: false
+        type: string
+
+jobs:
+  manual-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Validate version format
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+          echo "❌ 잘못된 버전 형식입니다. 올바른 형식: v1.2.3 또는 v1.2.3-beta"
+          exit 1
+        fi
+        echo "✅ 버전 형식이 올바릅니다: $VERSION"
+
+    - name: Check if tag exists
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        if git tag -l | grep -q "^$VERSION$"; then
+          echo "❌ 태그 $VERSION이 이미 존재합니다."
+          exit 1
+        fi
+        echo "✅ 새로운 태그입니다: $VERSION"
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+        CUSTOM_CHANGELOG="${{ github.event.inputs.changelog }}"
+        
+        # 최신 태그 찾기
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        
+        if [ -n "$CUSTOM_CHANGELOG" ]; then
+          # 사용자 정의 릴리스 노트
+          echo "## 🚀 $VERSION" > changelog.md
+          echo "" >> changelog.md
+          echo "$CUSTOM_CHANGELOG" >> changelog.md
+        else
+          # 자동 생성 릴리스 노트
+          echo "## 🚀 $VERSION" > changelog.md
+          echo "" >> changelog.md
+          
+          if [ "$RELEASE_TYPE" = "hotfix" ]; then
+            echo "### 🔥 Hotfix Release" >> changelog.md
+            echo "긴급 수정 사항이 포함된 릴리스입니다." >> changelog.md
+          elif [ "$RELEASE_TYPE" = "prerelease" ]; then
+            echo "### 🧪 Pre-release" >> changelog.md
+            echo "테스트 목적의 사전 릴리스입니다." >> changelog.md
+          fi
+          
+          echo "" >> changelog.md
+          echo "### 📋 Changes" >> changelog.md
+          
+          if [ -n "$LATEST_TAG" ]; then
+            git log $LATEST_TAG..HEAD --oneline --pretty=format:"- %s" >> changelog.md
+          else
+            echo "- 초기 릴리스" >> changelog.md
+          fi
+        fi
+        
+        echo "" >> changelog.md
+        echo "### 🐳 Docker Images" >> changelog.md
+        echo "\`\`\`bash" >> changelog.md
+        echo "docker pull \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:$VERSION" >> changelog.md
+        echo "docker pull \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest" >> changelog.md
+        echo "\`\`\`" >> changelog.md
+        
+        # 출력용
+        CHANGELOG_CONTENT=$(cat changelog.md)
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create and push tag
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        
+        # Git 설정
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # 태그 생성
+        git tag -a "$VERSION" -m "Manual release $VERSION"
+        git push origin "$VERSION"
+        
+        echo "✅ 태그 생성 및 푸시 완료: $VERSION"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: "Release ${{ github.event.inputs.version }}"
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Summary
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+        
+        echo "🎉 수동 릴리스 생성 완료!"
+        echo "📦 버전: $VERSION"
+        echo "🏷️ 타입: $RELEASE_TYPE"
+        echo "🐳 Docker 이미지가 자동으로 빌드됩니다."
+        echo "📋 릴리스 페이지: https://github.com/${{ github.repository }}/releases/tag/$VERSION"

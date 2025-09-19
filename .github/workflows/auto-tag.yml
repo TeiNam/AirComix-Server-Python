@@ -1,0 +1,164 @@
+name: Auto Tag and Release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/**'
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new-tag: ${{ steps.tag.outputs.new-tag }}
+      changelog: ${{ steps.tag.outputs.changelog }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get latest tag
+      id: get-latest-tag
+      run: |
+        # 최신 태그 가져오기 (없으면 v0.9.0으로 시작하여 첫 릴리스가 v1.0.0이 되도록)
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.9.0")
+        echo "latest-tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+        echo "Latest tag: $LATEST_TAG"
+
+    - name: Determine version bump
+      id: version-bump
+      run: |
+        # 커밋 메시지 분석하여 버전 범프 결정
+        COMMITS=$(git log ${{ steps.get-latest-tag.outputs.latest-tag }}..HEAD --oneline)
+        echo "Recent commits:"
+        echo "$COMMITS"
+        
+        if echo "$COMMITS" | grep -qE "^[a-f0-9]+ (feat|feature)(\(.+\))?!:|BREAKING CHANGE:"; then
+          echo "bump=major" >> $GITHUB_OUTPUT
+          echo "Version bump: MAJOR (breaking change)"
+        elif echo "$COMMITS" | grep -qE "^[a-f0-9]+ (feat|feature)(\(.+\))?:"; then
+          echo "bump=minor" >> $GITHUB_OUTPUT
+          echo "Version bump: MINOR (new feature)"
+        elif echo "$COMMITS" | grep -qE "^[a-f0-9]+ (fix|bugfix|hotfix)(\(.+\))?:"; then
+          echo "bump=patch" >> $GITHUB_OUTPUT
+          echo "Version bump: PATCH (bug fix)"
+        elif echo "$COMMITS" | grep -qE "^[a-f0-9]+ (refactor|perf|docs|style|test|chore)(\(.+\))?:"; then
+          echo "bump=patch" >> $GITHUB_OUTPUT
+          echo "Version bump: PATCH (maintenance)"
+        else
+          echo "bump=patch" >> $GITHUB_OUTPUT
+          echo "Version bump: PATCH (default)"
+        fi
+
+    - name: Calculate new version
+      id: new-version
+      run: |
+        LATEST_TAG="${{ steps.get-latest-tag.outputs.latest-tag }}"
+        BUMP_TYPE="${{ steps.version-bump.outputs.bump }}"
+        
+        # v 접두사 제거
+        VERSION=${LATEST_TAG#v}
+        
+        # 버전 분리
+        IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
+        MAJOR=${VERSION_PARTS[0]:-0}
+        MINOR=${VERSION_PARTS[1]:-0}
+        PATCH=${VERSION_PARTS[2]:-0}
+        
+        # 버전 범프
+        case $BUMP_TYPE in
+          major)
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            ;;
+          minor)
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            ;;
+          patch)
+            PATCH=$((PATCH + 1))
+            ;;
+        esac
+        
+        NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+        echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        LATEST_TAG="${{ steps.get-latest-tag.outputs.latest-tag }}"
+        NEW_VERSION="${{ steps.new-version.outputs.new-version }}"
+        
+        echo "## 🚀 Changes in $NEW_VERSION" > changelog.md
+        echo "" >> changelog.md
+        
+        # 커밋 메시지를 카테고리별로 분류
+        git log $LATEST_TAG..HEAD --oneline --pretty=format:"%s" | while read -r commit; do
+          if echo "$commit" | grep -qE "^(feat|feature)(\(.+\))?:"; then
+            echo "### ✨ New Features" >> changelog.md
+            echo "- $commit" >> changelog.md
+          elif echo "$commit" | grep -qE "^(fix|bugfix|hotfix)(\(.+\))?:"; then
+            echo "### 🐛 Bug Fixes" >> changelog.md
+            echo "- $commit" >> changelog.md
+          elif echo "$commit" | grep -qE "^refactor(\(.+\))?:"; then
+            echo "### ♻️ Code Refactoring" >> changelog.md
+            echo "- $commit" >> changelog.md
+          elif echo "$commit" | grep -qE "^(docs|doc)(\(.+\))?:"; then
+            echo "### 📚 Documentation" >> changelog.md
+            echo "- $commit" >> changelog.md
+          elif echo "$commit" | grep -qE "^(perf|performance)(\(.+\))?:"; then
+            echo "### ⚡ Performance Improvements" >> changelog.md
+            echo "- $commit" >> changelog.md
+          else
+            echo "### 🔧 Other Changes" >> changelog.md
+            echo "- $commit" >> changelog.md
+          fi
+        done
+        
+        echo "" >> changelog.md
+        echo "### 🐳 Docker Images" >> changelog.md
+        echo "\`\`\`bash" >> changelog.md
+        echo "docker pull \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:$NEW_VERSION" >> changelog.md
+        echo "docker pull \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest" >> changelog.md
+        echo "\`\`\`" >> changelog.md
+        
+        # 출력용
+        CHANGELOG_CONTENT=$(cat changelog.md)
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create and push tag
+      id: tag
+      run: |
+        NEW_VERSION="${{ steps.new-version.outputs.new-version }}"
+        
+        # Git 설정
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # 태그 생성
+        git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+        git push origin "$NEW_VERSION"
+        
+        echo "new-tag=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "Created and pushed tag: $NEW_VERSION"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag.outputs.new-tag }}
+        name: Release ${{ steps.tag.outputs.new-tag }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,115 @@
+name: Update Docker Hub README
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'README.md'
+      - 'docker/**'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  update-dockerhub-readme:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Generate Docker Hub README
+      run: |
+        cat > DOCKER_README.md << 'EOF'
+        # AirComix Server - Python Port
+        
+        [![Docker Pulls](https://img.shields.io/docker/pulls/${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server)](https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server)
+        [![Docker Image Size](https://img.shields.io/docker/image-size/${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server/latest)](https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server)
+        [![GitHub](https://img.shields.io/github/license/TeiNam/AirComix-Server-Python)](https://github.com/TeiNam/AirComix-Server-Python)
+        
+        AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python 포트입니다.
+        
+        ## 🚀 빠른 시작
+        
+        ### 기본 실행
+        ```bash
+        docker run -d \
+          --name aircomix-server \
+          -p 31257:31257 \
+          -v /path/to/your/comix:/comix:ro \
+          ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest
+        ```
+        
+        ### 인증 활성화
+        ```bash
+        docker run -d \
+          --name aircomix-server \
+          -p 31257:31257 \
+          -v /path/to/your/comix:/comix:ro \
+          -e COMIX_ENABLE_AUTH=true \
+          -e COMIX_AUTH_USERNAME=admin \
+          -e COMIX_AUTH_PASSWORD=your_secure_password \
+          ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest
+        ```
+        
+        ### Docker Compose 사용
+        ```yaml
+        version: '3.8'
+        services:
+          aircomix-server:
+            image: ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest
+            container_name: aircomix-server
+            ports:
+              - "31257:31257"
+            volumes:
+              - /path/to/your/comix:/comix:ro
+            environment:
+              - COMIX_ENABLE_AUTH=false
+            restart: unless-stopped
+        ```
+        
+        ## 📋 지원 파일 형식
+        
+        ### 이미지 파일
+        - JPEG, PNG, GIF, BMP, TIFF, WebP
+        
+        ### 아카이브 파일
+        - ZIP, RAR, CBZ, CBR
+        
+        ## ⚙️ 환경 변수
+        
+        | 변수명 | 기본값 | 설명 |
+        |--------|--------|------|
+        | `COMIX_MANGA_DIRECTORY` | `/comix` | 만화 파일 디렉토리 |
+        | `COMIX_SERVER_PORT` | `31257` | 서버 포트 |
+        | `COMIX_DEBUG_MODE` | `false` | 디버그 모드 |
+        | `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 |
+        | `COMIX_ENABLE_AUTH` | `false` | 기본 인증 활성화 |
+        | `COMIX_AUTH_USERNAME` | - | 인증 사용자명 |
+        | `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 |
+        
+        ## 🏷️ 사용 가능한 태그
+        
+        - `latest` - 최신 안정 버전
+        - `dev` - 개발 버전
+        - `v1.0.0`, `v1.0.1` - 특정 버전
+        
+        ## 🔗 링크
+        
+        - **GitHub**: https://github.com/TeiNam/AirComix-Server-Python
+        - **AirComix iOS 앱**: https://apps.apple.com/app/aircomix/
+        - **문제 보고**: https://github.com/TeiNam/AirComix-Server-Python/issues
+        
+        ## 📄 라이선스
+        
+        MIT License - 자세한 내용은 [LICENSE](https://github.com/TeiNam/AirComix-Server-Python/blob/main/LICENSE) 참조
+        EOF
+
+    - name: Update Docker Hub Description
+      uses: peter-evans/dockerhub-description@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        repository: ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server
+        readme-filepath: ./DOCKER_README.md

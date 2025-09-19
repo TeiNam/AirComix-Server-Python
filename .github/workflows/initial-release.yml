@@ -1,0 +1,118 @@
+name: Create Initial Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Initial version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+
+jobs:
+  create-initial-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Check if tags exist
+      id: check-tags
+      run: |
+        if git tag -l | grep -q .; then
+          echo "has-tags=true" >> $GITHUB_OUTPUT
+          echo "⚠️ 태그가 이미 존재합니다. 기존 태그:"
+          git tag -l
+        else
+          echo "has-tags=false" >> $GITHUB_OUTPUT
+          echo "✅ 태그가 없습니다. 초기 릴리스를 생성할 수 있습니다."
+        fi
+
+    - name: Validate version format
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ 잘못된 버전 형식입니다. 올바른 형식: v1.0.0"
+          exit 1
+        fi
+        echo "✅ 버전 형식이 올바릅니다: $VERSION"
+
+    - name: Generate initial changelog
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        
+        cat > changelog.md << EOF
+        ## 🚀 AirComix Server Python Port $VERSION
+        
+        AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 첫 번째 공식 릴리스입니다.
+        
+        ### ✨ 주요 기능
+        - 🚀 **FastAPI 기반 고성능 서버**: 비동기 처리로 빠른 응답
+        - 🔒 **보안 강화**: HTTP Basic Authentication 지원
+        - 📦 **Docker 지원**: 간편한 배포 및 관리
+        - 🌏 **다국어 지원**: 한글, 일본어 파일명 완벽 지원
+        - 🧪 **안정성**: 포괄적인 테스트 스위트
+        
+        ### 📋 지원 파일 형식
+        - **이미지**: JPEG, PNG, GIF, BMP, TIFF, WebP
+        - **아카이브**: ZIP, RAR, CBZ, CBR
+        
+        ### 🐳 Docker 이미지
+        \`\`\`bash
+        # 최신 버전
+        docker pull \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:$VERSION
+        docker pull \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest
+        
+        # 빠른 시작
+        docker run -d \\
+          --name aircomix-server \\
+          -p 31257:31257 \\
+          -v /path/to/your/comix:/comix:ro \\
+          \${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:$VERSION
+        \`\`\`
+        
+        ### 🔗 링크
+        - **GitHub**: https://github.com/TeiNam/AirComix-Server-Python
+        - **Docker Hub**: https://hub.docker.com/r/\${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server
+        - **AirComix iOS 앱**: https://apps.apple.com/app/aircomix/
+        
+        ### 📄 라이선스
+        MIT License
+        EOF
+
+    - name: Create and push initial tag
+      if: steps.check-tags.outputs.has-tags == 'false'
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        
+        # Git 설정
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # 태그 생성
+        git tag -a "$VERSION" -m "Initial release $VERSION"
+        git push origin "$VERSION"
+        
+        echo "✅ 초기 태그 생성 완료: $VERSION"
+
+    - name: Create GitHub Release
+      if: steps.check-tags.outputs.has-tags == 'false'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: "🚀 AirComix Server ${{ github.event.inputs.version }}"
+        body_path: ./changelog.md
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Skip if tags exist
+      if: steps.check-tags.outputs.has-tags == 'true'
+      run: |
+        echo "⚠️ 태그가 이미 존재하므로 초기 릴리스 생성을 건너뜁니다."
+        echo "기존 태그를 확인하고 필요시 수동으로 관리하세요."
