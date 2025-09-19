@@ -225,6 +225,21 @@ update: ## 최신 변경사항 가져오기 및 재빌드
 	@$(MAKE) restart
 	@echo "✅ 업데이트 완료"
 
+release: ## 수동 릴리스 생성 (버전 입력 필요)
+	@echo "🚀 수동 릴리스 생성"
+	@read -p "릴리스 버전을 입력하세요 (예: v1.2.3): " VERSION; \
+	if [ -z "$$VERSION" ]; then \
+		echo "❌ 버전을 입력해야 합니다."; \
+		exit 1; \
+	fi; \
+	git tag -a "$$VERSION" -m "Release $$VERSION"; \
+	git push origin "$$VERSION"; \
+	echo "✅ 릴리스 $$VERSION 생성 완료"
+
+tag-list: ## 현재 태그 목록 확인
+	@echo "📋 현재 태그 목록:"
+	@git tag -l --sort=-version:refname | head -10
+
 # =============================================================================
 # 정보 명령어 (Information Commands)
 # =============================================================================
