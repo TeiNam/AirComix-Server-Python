@@ -41,6 +41,7 @@ RUN pip install --upgrade pip setuptools wheel
 
 # 소스 코드 복사
 COPY app/ ./app/
+COPY images/ ./images/
 COPY README.md ./
 
 # 개발 의존성 설치 (editable mode) 및 캐시 정리

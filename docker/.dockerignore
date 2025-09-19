@@ -96,7 +96,7 @@ tests/
 test_*/
 docs/
 examples/
-images/
+# images/ - AirComix 썸네일용 이미지 필요하므로 제외하지 않음
 
 # 마크다운 파일 (README.md 제외)
 *.md

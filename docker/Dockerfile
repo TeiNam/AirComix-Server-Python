@@ -30,6 +30,7 @@ RUN pip install --upgrade pip setuptools wheel
 
 # 소스 코드 복사
 COPY app/ ./app/
+COPY images/ ./images/
 COPY README.md ./
 
 # 패키지 설치 및 캐시 정리
@@ -72,6 +73,7 @@ WORKDIR /app
 
 # 애플리케이션 코드 복사
 COPY --chown=comix:comix app/ ./app/
+COPY --chown=comix:comix images/ ./images/
 COPY --chown=comix:comix README.md ./
 
 # 디버깅: 복사된 파일 구조 확인
