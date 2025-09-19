@@ -1,14 +1,15 @@
 # Comix Server Python Port
 
-
-[![Docker Build](https://github.com/[사용자명]/comix-server-python/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/docker-build.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/[사용자명]/aircomix-server)](https://hub.docker.com/r/[사용자명]/aircomix-server)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![AirComix Compatible](https://img.shields.io/badge/AirComix-100%25%20Compatible-blue?style=for-the-badge)](https://apps.apple.com/app/aircomix/)
 
 AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python 포트입니다. 기존 PHP 서버를 FastAPI로 재구현하여 더 나은 성능과 안정성을 제공합니다.
+
+## Docker Repository
+- https://hub.docker.com/r/teinam/aircomix-server 
+
 
 ## ✨ 주요 개선사항
 
