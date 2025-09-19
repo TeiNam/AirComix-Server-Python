@@ -31,17 +31,26 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """요청 처리 및 인증 확인"""
         
+        # 디버깅 로그
+        logger.debug(f"인증 미들웨어 - 요청 경로: {request.url.path}")
+        logger.debug(f"인증 활성화 상태: {settings.enable_auth}")
+        logger.debug(f"패스워드 설정 여부: {bool(settings.auth_password)}")
+        
         # 인증이 비활성화된 경우 통과
         if not settings.enable_auth:
+            logger.debug("인증 비활성화 - 요청 통과")
             return await call_next(request)
         
         # 제외 경로 확인
         if request.url.path in self.exclude_paths:
+            logger.debug(f"제외 경로 - 요청 통과: {request.url.path}")
             return await call_next(request)
         
         # Authorization 헤더 확인
         auth_header = request.headers.get("Authorization")
+        logger.debug(f"Authorization 헤더: {bool(auth_header)}")
         if not auth_header:
+            logger.debug("Authorization 헤더 없음 - 401 반환")
             return self._unauthorized_response()
         
         # Basic 인증 확인

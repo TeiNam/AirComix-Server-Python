@@ -106,5 +106,5 @@ echo -e "${GREEN}🎉 인증 기능 테스트 완료!${NC}"
 echo ""
 echo -e "${BLUE}사용법:${NC}"
 echo "1. 인증 비활성화: COMIX_ENABLE_AUTH=false"
-echo "2. 인증 활성화: COMIX_ENABLE_AUTH=true + AUTH_PASSWORD 설정"
+echo "2. 인증 활성화: COMIX_ENABLE_AUTH=true + COMIX_AUTH_PASSWORD 설정"
 echo "3. AirComix 앱에서 패스워드만 입력 (.htaccess 방식)"

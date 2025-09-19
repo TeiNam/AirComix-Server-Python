@@ -10,10 +10,6 @@ on:
   pull_request:
     branches:
       - main
-  workflow_run:
-    workflows: ["Auto Tag and Release"]
-    types:
-      - completed
 
 env:
   REGISTRY: docker.io

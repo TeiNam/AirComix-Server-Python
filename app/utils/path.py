@@ -253,3 +253,34 @@ class PathUtils:
             return ""
         
         return Path(normalized).name
+    
+    @staticmethod
+    def resolve_safe_path(base_path: Path, requested_path: str) -> Path:
+        """
+        안전한 경로 해결 (디렉토리 순회 공격 방지)
+        
+        Args:
+            base_path: 기준 경로 (manga 디렉토리)
+            requested_path: 요청된 경로
+            
+        Returns:
+            Path: 해결된 안전한 경로
+            
+        Raises:
+            ValueError: 안전하지 않은 경로인 경우
+        """
+        if not PathUtils.is_safe_path(base_path, requested_path):
+            raise ValueError(f"안전하지 않은 경로: {requested_path}")
+        
+        # URL 디코딩
+        decoded_path = urllib.parse.unquote(requested_path)
+        
+        # 경로 정규화
+        normalized_path = PathUtils.normalize_path(decoded_path)
+        
+        # 빈 경로인 경우 기준 경로 반환
+        if not normalized_path:
+            return base_path
+        
+        # 안전한 경로 결합
+        return base_path / normalized_path

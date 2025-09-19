@@ -69,8 +69,8 @@ def create_app() -> FastAPI:
     # 인증 미들웨어 설정
     if settings.enable_auth:
         app.add_middleware(BasicAuthMiddleware)
-        logger.info("Basic Auth 미들웨어 활성화됨")
-        logger.info(f"인증 사용자: {settings.auth_username}")
+        logger.info("Basic Auth 미들웨어 활성화됨 (.htaccess 방식)")
+        logger.info("패스워드 인증 활성화됨")
     
     # CORS 미들웨어 설정 (디버그 모드에서만)
     if settings.debug_mode:

@@ -57,9 +57,9 @@ docker run -d \
   --name aircomix-server \
   -p 31257:8000 \
   -v /path/to/your/manga:/comix \
-  -e MANGA_DIRECTORY=/comix \
-  -e ENABLE_AUTH=true \
-  -e AUTH_PASSWORD=your_password \
+  -e COMIX_MANGA_DIRECTORY=/comix \
+  -e COMIX_ENABLE_AUTH=true \
+  -e COMIX_AUTH_PASSWORD=your_password \
   aircomix/aircomix-server:latest
 ```
 
