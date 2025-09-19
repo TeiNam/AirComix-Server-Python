@@ -37,7 +37,7 @@ jobs:
         docker run -d \
           --name aircomix-server \
           -p 31257:31257 \
-          -v /path/to/your/comix:/comix:ro \
+          -v /path/to/your/comix:/comix \
           ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest
         ```
         
@@ -46,9 +46,8 @@ jobs:
         docker run -d \
           --name aircomix-server \
           -p 31257:31257 \
-          -v /path/to/your/comix:/comix:ro \
+          -v /path/to/your/comix:/comix \
           -e COMIX_ENABLE_AUTH=true \
-          -e COMIX_AUTH_USERNAME=admin \
           -e COMIX_AUTH_PASSWORD=your_secure_password \
           ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest
         ```
@@ -86,14 +85,13 @@ jobs:
         | `COMIX_DEBUG_MODE` | `false` | 디버그 모드 |
         | `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 |
         | `COMIX_ENABLE_AUTH` | `false` | 기본 인증 활성화 |
-        | `COMIX_AUTH_USERNAME` | - | 인증 사용자명 |
         | `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 |
         
         ## 🏷️ 사용 가능한 태그
         
         - `latest` - 최신 안정 버전
         - `dev` - 개발 버전
-        - `v1.0.0`, `v1.0.1` - 특정 버전
+        - `v1.x.x` - 특정 버전
         
         ## 🔗 링크
         
