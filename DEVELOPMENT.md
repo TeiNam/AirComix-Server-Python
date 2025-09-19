@@ -35,17 +35,20 @@ export COMIX_MANGA_DIRECTORY=/tmp/test-comix
 export COMIX_DEBUG_MODE=true
 ```
 
-### 4. 테스트 실행
+### 4. 테스트 실행 (선택사항)
 
 ```bash
-# 모든 테스트 실행
+# 간단한 테스트 실행
+python -m pytest tests/test_simple.py -v
+
+# 모든 테스트 실행 (시간이 오래 걸릴 수 있음)
 python -m pytest tests/ -v
 
 # 커버리지와 함께 테스트
 python -m pytest tests/ -v --cov=app --cov-report=html
 
-# 특정 테스트만 실행
-python -m pytest tests/test_config.py -v
+# Docker 빌드 테스트 (권장)
+make test-build
 ```
 
 ### 5. 코드 품질 검사

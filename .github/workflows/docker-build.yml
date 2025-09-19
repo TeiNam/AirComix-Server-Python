@@ -10,6 +10,10 @@ on:
   pull_request:
     branches:
       - main
+  workflow_run:
+    workflows: ["Auto Tag and Release"]
+    types:
+      - completed
 
 env:
   REGISTRY: docker.io
@@ -60,6 +64,17 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    - name: Get version info
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-$(date +%Y%m%d)")
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -72,8 +87,15 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=AirComix Server
+          org.opencontainers.image.description=Comic book streaming server compatible with AirComix iOS app
+          org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
-    - name: Build and push Docker image
+    - name: Build and test Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -86,6 +108,24 @@ jobs:
         cache-to: type=gha,mode=max
         build-args: |
           BUILDKIT_INLINE_CACHE=1
+          
+    - name: Test Docker image
+      if: github.event_name != 'pull_request'
+      run: |
+        echo "🧪 Docker 이미지 기본 테스트"
+        # 임시 컨테이너로 헬스체크 테스트
+        docker run --rm -d --name test-container -p 31259:31257 \
+          -e COMIX_MANGA_DIRECTORY=/tmp \
+          -e COMIX_DEBUG_MODE=true \
+          ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest || true
+        
+        sleep 10
+        
+        # 헬스체크 테스트
+        curl -f http://localhost:31259/health || echo "Health check failed"
+        
+        # 컨테이너 정리
+        docker stop test-container || true
 
     - name: Build development image
       if: github.ref == 'refs/heads/develop'

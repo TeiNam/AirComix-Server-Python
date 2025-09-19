@@ -1,6 +1,6 @@
 # Comix Server Python Port
 
-[![Tests](https://github.com/[사용자명]/comix-server-python/workflows/Tests/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/test.yml)
+
 [![Docker Build](https://github.com/[사용자명]/comix-server-python/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/docker-build.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/[사용자명]/aircomix-server)](https://hub.docker.com/r/[사용자명]/aircomix-server)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
