@@ -25,7 +25,9 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             "/health",
             "/docs",
             "/openapi.json",
-            "/redoc"
+            "/redoc",
+            "/",  # 루트 디렉토리 이름
+            "/welcome.102"  # 서버 정보
         ]
     
     async def dispatch(self, request: Request, call_next):
@@ -39,9 +41,15 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         if request.url.path in self.exclude_paths:
             return await call_next(request)
         
+        # AirComix 호환성: 루트 디렉토리 목록 요청은 인증 없이 허용
+        if request.url.path == "/comix" or request.url.path == "/comix/":
+            return await call_next(request)
+        
         # Authorization 헤더 확인
         auth_header = request.headers.get("Authorization")
         if not auth_header:
+            # 디버깅: 어떤 경로에서 인증 실패하는지 로그
+            print(f"[AUTH] 인증 헤더 없음: {request.method} {request.url.path}")
             return self._unauthorized_response()
         
         # Basic 인증 확인
@@ -60,12 +68,15 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             
             # 패스워드 확인
             if not self._verify_password(password):
+                print(f"[AUTH] 패스워드 불일치: {request.method} {request.url.path}")
                 return self._unauthorized_response()
             
         except (ValueError, UnicodeDecodeError):
+            print(f"[AUTH] 인증 헤더 파싱 실패: {request.method} {request.url.path}")
             return self._unauthorized_response()
         
         # 인증 성공, 요청 계속 처리
+        print(f"[AUTH] 인증 성공: {request.method} {request.url.path}")
         return await call_next(request)
     
     def _verify_password(self, password: str) -> bool:
