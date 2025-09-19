@@ -1,9 +1,16 @@
-# Git and version control
+# Docker ignore patterns for Comix Server
+# Docker 빌드 시 제외할 파일 및 디렉토리
+
+# =============================================================================
+# 버전 관리 시스템 (Version Control Systems)
+# =============================================================================
 .git/
 .gitignore
 .gitattributes
 
-# Python
+# =============================================================================
+# Python 관련 (Python Related)
+# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -26,23 +33,11 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
-.env
-.venv/
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# PyInstaller
+*.manifest
+*.spec
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Testing
+# 테스트 및 커버리지 (Testing & Coverage)
 .pytest_cache/
 .coverage
 htmlcov/
@@ -52,31 +47,96 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+.mypy_cache/
 
-# Documentation
-docs/
-*.md
-!README.md
+# 가상환경 (Virtual Environments)
+.env
+.env.*
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# OS generated files
+# =============================================================================
+# IDE 및 에디터 (IDEs & Editors)
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# =============================================================================
+# 운영체제 (Operating Systems)
+# =============================================================================
+# macOS
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
+
+# Windows
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# Project specific
+# Linux
+*~
+
+# =============================================================================
+# 프로젝트 특화 (Project Specific)
+# =============================================================================
+# 테스트 및 문서
 tests/
 test_*/
-*.log
-.env.example
+docs/
+examples/
+images/
 
-# Development files
-php_origins/
+# 마크다운 파일 (README.md 제외)
+*.md
+!README.md
+
+# 설정 파일
 .kiro/
+deployment/
+php_origins/
 
-# Temporary files
+# 로그 파일
+*.log
+logs/
+
+# 임시 파일
+*.tmp
+*.temp
 tmp/
 temp/
+
+# =============================================================================
+# Docker 관련 (Docker Related)
+# =============================================================================
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# =============================================================================
+# 개발 도구 (Development Tools)
+# =============================================================================
+.black
+.isort.cfg
+.flake8
+
+# Makefile (선택적으로 제외)
+Makefile
+
+# 환경 설정 파일
+.env.example
+.env.docker
+
+# 요구사항 파일 (개발용)
+requirements-dev.txt

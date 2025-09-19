@@ -52,14 +52,14 @@ def test_root_directory_listing(sample_manga_structure):
     # 테스트용 앱 생성
     app = FastAPI()
     
-    @app.get("/manga/{path:path}")
+    @app.get("/comix/{path:path}")
     async def handle_manga_request(path: str):
         return await manga_handler.handle_request(path)
     
     test_client = TestClient(app)
     
     # 루트 디렉토리 요청 (빈 경로)
-    response = test_client.get("/manga/")
+    response = test_client.get("/comix/")
     
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -93,14 +93,14 @@ def test_series_directory_listing(sample_manga_structure):
     # 테스트용 앱 생성
     app = FastAPI()
     
-    @app.get("/manga/{path:path}")
+    @app.get("/comix/{path:path}")
     async def handle_manga_request(path: str):
         return await manga_handler.handle_request(path)
     
     test_client = TestClient(app)
     
     # Series A 디렉토리 요청
-    response = test_client.get("/manga/Series%20A")
+    response = test_client.get("/comix/Series%20A")
     
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/plain; charset=utf-8"

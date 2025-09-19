@@ -33,7 +33,7 @@ class TestBasicRoutes:
     def test_get_root_directory_name_with_custom_path(self, client):
         """커스텀 경로로 루트 디렉토리 이름 조회 테스트"""
         with patch('app.api.routes.settings') as mock_settings:
-            mock_settings.manga_directory = "/custom/manga/path"
+            mock_settings.manga_directory = "/custom/comix/path"
             
             response = client.get("/")
             
