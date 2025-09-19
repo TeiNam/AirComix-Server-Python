@@ -1,5 +1,8 @@
 # Comix Server Python Port
 
+[![Tests](https://github.com/[사용자명]/comix-server-python/workflows/Tests/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/test.yml)
+[![Docker Build](https://github.com/[사용자명]/comix-server-python/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/docker-build.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/[사용자명]/comix-server)](https://hub.docker.com/r/[사용자명]/comix-server)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
@@ -17,19 +20,29 @@ AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python �
 
 ## 🚀 빠른 시작
 
-### Docker 사용 (권장)
+### Docker Hub에서 바로 사용
+
+```bash
+# Docker Hub에서 최신 이미지 가져오기
+docker pull [사용자명]/comix-server:latest
+
+# 간단한 실행 (만화 디렉토리를 /path/to/your/comix로 변경)
+docker run -d \
+  --name comix-server \
+  -p 31257:31257 \
+  -v /path/to/your/comix:/comix:ro \
+  [사용자명]/comix-server:latest
+```
+
+### 소스에서 빌드 (권장)
 
 ```bash
 # 저장소 클론
-git clone https://github.com/TeiNam/AirComix-Server-Python.git
-cd AirComix-Server-Python
+git clone https://github.com/[사용자명]/comix-server-python.git
+cd comix-server-python
 
-# Docker 디렉토리로 이동
-cd docker
-
-# 환경 설정
-cp .env.example .env
-# .env 파일에서 MANGA_DIRECTORY 경로 설정
+# 빠른 시작 (자동 설정 및 실행)
+make quick-start
 
 # 실행
 docker-compose up -d
@@ -105,7 +118,38 @@ docker-compose build
 | `/` | 만화 디렉토리 이름 반환 |
 | `/welcome.102` | 서버 기능 정보 |
 | `/health` | 서버 상태 확인 |
-| `/manga/{path}` | 파일/디렉토리 목록 또는 이미지 스트리밍 |
+| `/comix/{path}` | 파일/디렉토리 목록 또는 이미지 스트리밍 |
+
+## 🐳 Docker 이미지
+
+### 사용 가능한 태그
+
+| 태그 | 설명 | 플랫폼 |
+|------|------|--------|
+| `latest` | 최신 안정 버전 | linux/amd64, linux/arm64 |
+| `dev` | 개발 버전 | linux/amd64, linux/arm64 |
+| `v1.0.0` | 특정 버전 | linux/amd64, linux/arm64 |
+
+### Docker Hub
+```bash
+docker pull [사용자명]/comix-server:latest
+docker pull [사용자명]/comix-server:dev
+```
+
+### GitHub Container Registry
+```bash
+docker pull ghcr.io/[사용자명]/comix-server:latest
+docker pull ghcr.io/[사용자명]/comix-server:dev
+```
+
+### 환경 변수
+
+| 변수명 | 기본값 | 설명 |
+|--------|--------|------|
+| `COMIX_MANGA_DIRECTORY` | `/comix` | 만화 파일 디렉토리 |
+| `COMIX_SERVER_PORT` | `31257` | 서버 포트 |
+| `COMIX_DEBUG_MODE` | `false` | 디버그 모드 |
+| `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 |
 
 ## 📄 라이선스
 

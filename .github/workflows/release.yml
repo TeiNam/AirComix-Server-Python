@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  docker-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "major_minor=$(echo $VERSION | cut -d. -f1-2)" >> $GITHUB_OUTPUT
+        echo "major=$(echo $VERSION | cut -d. -f1)" >> $GITHUB_OUTPUT
+
+    - name: Build and push to Docker Hub
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/comix-server:latest
+          ${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.version }}
+          ${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.major_minor }}
+          ${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.major }}
+        labels: |
+          org.opencontainers.image.title=Comix Server
+          org.opencontainers.image.description=Comic book streaming server compatible with AirComix iOS app
+          org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+    - name: Build and push to GitHub Container Registry
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/comix-server:latest
+          ghcr.io/${{ github.repository_owner }}/comix-server:${{ steps.version.outputs.version }}
+          ghcr.io/${{ github.repository_owner }}/comix-server:${{ steps.version.outputs.major_minor }}
+          ghcr.io/${{ github.repository_owner }}/comix-server:${{ steps.version.outputs.major }}
+        labels: |
+          org.opencontainers.image.title=Comix Server
+          org.opencontainers.image.description=Comic book streaming server compatible with AirComix iOS app
+          org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+  create-release-notes:
+    runs-on: ubuntu-latest
+    needs: docker-release
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Generate release notes
+      run: |
+        echo "## Docker Images" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Docker Hub" >> release_notes.md
+        echo '```bash' >> release_notes.md
+        echo "docker pull ${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.version }}" >> release_notes.md
+        echo "docker pull ${{ secrets.DOCKER_USERNAME }}/comix-server:latest" >> release_notes.md
+        echo '```' >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### GitHub Container Registry" >> release_notes.md
+        echo '```bash' >> release_notes.md
+        echo "docker pull ghcr.io/${{ github.repository_owner }}/comix-server:${{ steps.version.outputs.version }}" >> release_notes.md
+        echo "docker pull ghcr.io/${{ github.repository_owner }}/comix-server:latest" >> release_notes.md
+        echo '```' >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## Quick Start" >> release_notes.md
+        echo '```bash' >> release_notes.md
+        echo "# Clone the repository" >> release_notes.md
+        echo "git clone https://github.com/${{ github.repository }}.git" >> release_notes.md
+        echo "cd comix-server-python" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "# Quick start with Docker" >> release_notes.md
+        echo "make quick-start" >> release_notes.md
+        echo '```' >> release_notes.md
+
+    - name: Update release with notes
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.md
+        append_body: true

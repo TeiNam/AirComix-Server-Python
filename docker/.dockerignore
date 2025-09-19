@@ -107,6 +107,9 @@ images/
 deployment/
 php_origins/
 
+# GitHub Actions
+.github/
+
 # 로그 파일
 *.log
 logs/
