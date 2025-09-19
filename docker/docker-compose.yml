@@ -51,6 +51,9 @@ services:
       - COMIX_ENABLE_AUTH=${ENABLE_AUTH:-false}
       - COMIX_AUTH_USERNAME=${AUTH_USERNAME}
       - COMIX_AUTH_PASSWORD=${AUTH_PASSWORD}
+      
+      # Python 경로 설정
+      - PYTHONPATH=/app
     
     # 리소스 제한 (필요에 따라 조정)
     deploy:

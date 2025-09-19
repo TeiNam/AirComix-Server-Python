@@ -74,6 +74,12 @@ WORKDIR /app
 COPY --chown=comix:comix app/ ./app/
 COPY --chown=comix:comix README.md ./
 
+# 디버깅: 복사된 파일 구조 확인
+RUN echo "=== App directory structure ===" && \
+    find ./app -type f -name "*.py" | head -20 && \
+    echo "=== Middleware files ===" && \
+    ls -la ./app/middleware/ || echo "No middleware directory"
+
 # 만화 디렉토리 생성 및 권한 설정
 RUN mkdir -p /comix && \
     chown comix:comix /comix
@@ -87,6 +93,9 @@ EXPOSE 31257
 # 헬스체크 설정
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:31257/health || exit 1
+
+# Python 경로 설정
+ENV PYTHONPATH=/app
 
 # 기본 실행 명령어
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257"]

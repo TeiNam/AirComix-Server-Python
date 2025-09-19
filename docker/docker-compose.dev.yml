@@ -62,6 +62,9 @@ services:
       - COMIX_ENABLE_AUTH=${ENABLE_AUTH:-false}
       - COMIX_AUTH_USERNAME=${AUTH_USERNAME:-admin}
       - COMIX_AUTH_PASSWORD=${AUTH_PASSWORD:-password123}
+      
+      # Python 경로 설정
+      - PYTHONPATH=/app
     
     # 개발용 명령어 (핫 리로드 활성화)
     command: [
