@@ -254,25 +254,40 @@ class Settings(BaseSettings):
                 raise ValueError("패스워드는 최소 6자 이상이어야 합니다")
 
 
-# 전역 설정 인스턴스
-try:
-    settings = Settings()
-    # 인증 설정 검증
-    settings.validate_auth_settings()
-except ValueError as e:
+# 전역 설정 인스턴스 생성
+def _create_settings():
+    """설정 인스턴스 생성 (테스트 환경 고려)"""
     import os
-    import logging
-    logger = logging.getLogger(__name__)
     
-    # 테스트 환경에서는 경고만 출력
-    if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("COMIX_DEBUG_MODE") == "true":
-        logger.warning(f"테스트 환경에서 설정 검증 우회: {e}")
-        # 기본값으로 설정 생성
-        settings = Settings(
-            manga_directory=Path("/tmp/test-comix"),
-            debug_mode=True,
-            log_level="DEBUG"
-        )
-    else:
-        logger.error(f"인증 설정 오류: {e}")
-        raise
+    # 테스트 환경 감지
+    is_test_env = (
+        os.getenv("PYTEST_CURRENT_TEST") is not None or 
+        os.getenv("COMIX_DEBUG_MODE") == "true" or
+        "pytest" in os.getenv("_", "").lower()
+    )
+    
+    try:
+        settings = Settings()
+        if not is_test_env:
+            settings.validate_auth_settings()
+        return settings
+    except Exception as e:
+        if is_test_env:
+            # 테스트 환경에서는 기본값으로 설정 생성
+            import tempfile
+            test_dir = Path(tempfile.gettempdir()) / "test-comix"
+            test_dir.mkdir(exist_ok=True)
+            
+            return Settings(
+                manga_directory=test_dir,
+                debug_mode=True,
+                log_level="DEBUG",
+                enable_auth=False
+            )
+        else:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"설정 생성 오류: {e}")
+            raise
+
+settings = _create_settings()

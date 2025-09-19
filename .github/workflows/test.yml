@@ -40,26 +40,64 @@ jobs:
       run: |
         mkdir -p /tmp/test-comix
         echo "test" > /tmp/test-comix/test.txt
+        chmod 755 /tmp/test-comix
+        ls -la /tmp/test-comix
 
     - name: Debug test environment
       run: |
         echo "=== Python version ==="
         python --version
-        echo "=== Installed packages ==="
-        pip list
-        echo "=== Project structure ==="
-        find . -name "*.py" | head -20
-        echo "=== Test directory ==="
+        echo "=== Current directory ==="
+        pwd
+        echo "=== Directory contents ==="
+        ls -la
+        echo "=== App module check ==="
+        python -c "import sys; print('Python path:', sys.path)"
+        echo "=== Test directory contents ==="
         ls -la tests/ || echo "No tests directory"
         
-    - name: Run tests with pytest
+    - name: Simple import test
       env:
         COMIX_MANGA_DIRECTORY: /tmp/test-comix
         COMIX_DEBUG_MODE: true
         PYTEST_CURRENT_TEST: true
       run: |
-        echo "=== Running pytest ==="
-        python -m pytest tests/ -v --tb=short
+        echo "=== Testing basic imports ==="
+        python -c "
+        import sys
+        sys.path.insert(0, '.')
+        try:
+            from app.models.config import Settings
+            print('✅ Settings import successful')
+        except Exception as e:
+            print(f'❌ Settings import failed: {e}')
+            
+        try:
+            from app.main import create_app
+            print('✅ create_app import successful')
+        except Exception as e:
+            print(f'❌ create_app import failed: {e}')
+        "
+        
+    - name: Run simple tests first
+      env:
+        COMIX_MANGA_DIRECTORY: /tmp/test-comix
+        COMIX_DEBUG_MODE: true
+        PYTEST_CURRENT_TEST: true
+        PYTHONPATH: .
+      run: |
+        echo "=== Running simple tests ==="
+        python -m pytest tests/test_simple.py -v --tb=long
+        
+    - name: Run all tests
+      env:
+        COMIX_MANGA_DIRECTORY: /tmp/test-comix
+        COMIX_DEBUG_MODE: true
+        PYTEST_CURRENT_TEST: true
+        PYTHONPATH: .
+      run: |
+        echo "=== Running all tests ==="
+        python -m pytest tests/ -v --tb=short --maxfail=3
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
