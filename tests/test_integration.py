@@ -19,7 +19,7 @@ class TestRootEndpoint:
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
-        assert response.text == "manga"
+        assert response.text == "comix"
     
     def test_get_root_directory_name_with_custom_name(self, temp_manga_dir: Path, monkeypatch):
         """커스텀 디렉토리 이름 테스트"""
@@ -69,7 +69,7 @@ class TestDirectoryListingEndpoint:
     
     def test_list_root_directory(self, client: TestClient):
         """루트 디렉토리 목록 테스트"""
-        response = client.get("/manga/")
+        response = client.get("/comix/")
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -90,7 +90,7 @@ class TestDirectoryListingEndpoint:
     
     def test_list_subdirectory(self, client: TestClient):
         """하위 디렉토리 목록 테스트"""
-        response = client.get("/manga/Series%20A")
+        response = client.get("/comix/Series%20A")
         
         assert response.status_code == 200
         content = response.text
@@ -100,7 +100,7 @@ class TestDirectoryListingEndpoint:
     
     def test_list_image_directory(self, client: TestClient, sample_manga_structure):
         """이미지가 있는 디렉토리 목록 테스트"""
-        response = client.get("/manga/Series%20A/Volume%201")
+        response = client.get("/comix/Series%20A/Volume%201")
         
         assert response.status_code == 200
         content = response.text
@@ -113,7 +113,7 @@ class TestDirectoryListingEndpoint:
     
     def test_list_nonexistent_directory(self, client: TestClient, sample_manga_structure):
         """존재하지 않는 디렉토리 테스트"""
-        response = client.get("/manga/nonexistent")
+        response = client.get("/comix/nonexistent")
         
         # 존재하지 않는 디렉토리는 404 에러를 반환해야 함
         assert response.status_code == 404
@@ -123,7 +123,7 @@ class TestDirectoryListingEndpoint:
         empty_dir = temp_manga_dir / "empty"
         empty_dir.mkdir()
         
-        response = client.get("/manga/empty")
+        response = client.get("/comix/empty")
         
         assert response.status_code == 200
         assert response.text == ""
@@ -135,7 +135,7 @@ class TestArchiveListingEndpoint:
     
     def test_list_zip_archive(self, client: TestClient, sample_manga_structure):
         """ZIP 아카이브 목록 테스트"""
-        response = client.get("/manga/시리즈%20B/Chapter%20001.zip")
+        response = client.get("/comix/시리즈%20B/Chapter%20001.zip")
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -154,7 +154,7 @@ class TestArchiveListingEndpoint:
     
     def test_list_cbz_archive(self, client: TestClient, sample_manga_structure):
         """CBZ 아카이브 목록 테스트"""
-        response = client.get("/manga/시리즈%20B/Chapter%20002.cbz")
+        response = client.get("/comix/시리즈%20B/Chapter%20002.cbz")
         
         assert response.status_code == 200
         content = response.text
@@ -165,7 +165,7 @@ class TestArchiveListingEndpoint:
     
     def test_list_nonexistent_archive(self, client: TestClient, sample_manga_structure):
         """존재하지 않는 아카이브 테스트"""
-        response = client.get("/manga/nonexistent.zip")
+        response = client.get("/comix/nonexistent.zip")
         
         # 존재하지 않는 아카이브는 404 에러를 반환해야 함
         assert response.status_code == 404
@@ -173,7 +173,7 @@ class TestArchiveListingEndpoint:
     def test_list_corrupted_archive(self, client: TestClient, corrupted_archive: Path):
         """손상된 아카이브 테스트"""
         archive_name = corrupted_archive.name
-        response = client.get(f"/manga/{archive_name}")
+        response = client.get(f"/comix/{archive_name}")
         
         # 손상된 아카이브는 500 에러를 반환해야 함
         assert response.status_code == 500
@@ -185,7 +185,7 @@ class TestImageStreamingEndpoint:
     
     def test_stream_direct_image(self, client: TestClient, sample_manga_structure):
         """직접 이미지 파일 스트리밍 테스트"""
-        response = client.get("/manga/cover.png")
+        response = client.get("/comix/cover.png")
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
@@ -194,7 +194,7 @@ class TestImageStreamingEndpoint:
     
     def test_stream_image_from_directory(self, client: TestClient, sample_manga_structure):
         """디렉토리 내 이미지 스트리밍 테스트"""
-        response = client.get("/manga/Series%20A/Volume%201/page001.jpg")
+        response = client.get("/comix/Series%20A/Volume%201/page001.jpg")
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
@@ -202,7 +202,7 @@ class TestImageStreamingEndpoint:
     
     def test_stream_image_from_archive(self, client: TestClient, sample_manga_structure):
         """아카이브 내 이미지 스트리밍 테스트"""
-        response = client.get("/manga/시리즈%20B/Chapter%20001.zip/page001.jpg")
+        response = client.get("/comix/시리즈%20B/Chapter%20001.zip/page001.jpg")
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
@@ -210,14 +210,14 @@ class TestImageStreamingEndpoint:
     
     def test_stream_nonexistent_image(self, client: TestClient, sample_manga_structure):
         """존재하지 않는 이미지 테스트"""
-        response = client.get("/manga/nonexistent.jpg")
+        response = client.get("/comix/nonexistent.jpg")
         
         # 존재하지 않는 이미지는 404 에러를 반환해야 함
         assert response.status_code == 404
     
     def test_stream_nonexistent_image_from_archive(self, client: TestClient, sample_manga_structure):
         """아카이브 내 존재하지 않는 이미지 테스트"""
-        response = client.get("/manga/시리즈%20B/Chapter%20001.zip/nonexistent.jpg")
+        response = client.get("/comix/시리즈%20B/Chapter%20001.zip/nonexistent.jpg")
         
         # 아카이브 내 존재하지 않는 이미지는 404 또는 500 에러를 반환할 수 있음
         assert response.status_code in [404, 500]
@@ -230,21 +230,21 @@ class TestCharacterEncodingHandling:
     def test_unicode_directory_names(self, client: TestClient, encoding_test_data):
         """유니코드 디렉토리명 처리 테스트"""
         # 한국어 디렉토리
-        response = client.get("/manga/한국어%20만화")
+        response = client.get("/comix/한국어%20만화")
         assert response.status_code == 200
         
         # 일본어 디렉토리
-        response = client.get(f"/manga/{quote('日本語マンガ')}")
+        response = client.get(f"/comix/{quote('日本語マンガ')}")
         assert response.status_code == 200
         
         # 중국어 디렉토리
-        response = client.get(f"/manga/{quote('中文漫画')}")
+        response = client.get(f"/comix/{quote('中文漫画')}")
         assert response.status_code == 200
     
     def test_unicode_file_names(self, client: TestClient, encoding_test_data):
         """유니코드 파일명 처리 테스트"""
         # 한국어 파일명
-        response = client.get(f"/manga/한국어%20만화/한국어%20만화_cover.jpg")
+        response = client.get(f"/comix/한국어%20만화/한국어%20만화_cover.jpg")
         # 파일이 존재하면 200, 없으면 404/500 에러
         assert response.status_code in [200, 404, 500]
         if response.status_code == 200:
@@ -266,7 +266,7 @@ class TestSecurityAndValidation:
         ]
         
         for attempt in traversal_attempts:
-            response = client.get(f"/manga/{attempt}")
+            response = client.get(f"/comix/{attempt}")
             # 경로 순회 시도는 403 또는 404 에러를 반환해야 함
             assert response.status_code in [403, 404]
     
@@ -279,7 +279,7 @@ class TestSecurityAndValidation:
         ]
         
         for invalid_path in invalid_paths:
-            response = client.get(f"/manga/{quote(invalid_path)}")
+            response = client.get(f"/comix/{quote(invalid_path)}")
             # 유효하지 않은 문자는 403 또는 404 에러를 반환해야 함
             assert response.status_code in [403, 404]
 
@@ -290,7 +290,7 @@ class TestErrorScenarios:
     
     def test_unsupported_file_type(self, client: TestClient, sample_manga_structure):
         """지원되지 않는 파일 형식 테스트"""
-        response = client.get("/manga/readme.txt")
+        response = client.get("/comix/readme.txt")
         
         # 지원되지 않는 파일은 400 에러를 반환해야 함
         assert response.status_code == 400
@@ -299,7 +299,7 @@ class TestErrorScenarios:
         """권한 거부 시뮬레이션 테스트"""
         # 접근할 수 없는 디렉토리 시뮬레이션
         # (실제 권한 변경은 테스트 환경에서 복잡하므로 경로 검증으로 대체)
-        response = client.get("/manga/../outside_manga")
+        response = client.get("/comix/../outside_comix")
         
         assert response.status_code in [400, 403, 404, 500]
 
@@ -311,7 +311,7 @@ class TestPerformanceAndLargeFiles:
     def test_large_image_streaming(self, client: TestClient, large_image: Path):
         """대용량 이미지 스트리밍 테스트"""
         image_name = large_image.name
-        response = client.get(f"/manga/{image_name}")
+        response = client.get(f"/comix/{image_name}")
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
@@ -323,7 +323,7 @@ class TestPerformanceAndLargeFiles:
         responses = []
         
         for i in range(5):
-            response = client.get("/manga/cover.png")
+            response = client.get("/comix/cover.png")
             responses.append(response)
         
         # 모든 요청이 성공해야 함
@@ -350,46 +350,46 @@ class TestAirComixProtocolCompatibility:
         root_name = response.text
         
         # 3. 루트 디렉토리 목록 조회
-        response = client.get("/manga/")
+        response = client.get("/comix/")
         assert response.status_code == 200
         root_items = response.text.split("\n") if response.text else []
         
         # 4. 시리즈 디렉토리 탐색
         if "Series A" in root_items:
-            response = client.get("/manga/Series%20A")
+            response = client.get("/comix/Series%20A")
             assert response.status_code == 200
             
             # 5. 볼륨 디렉토리 탐색
             series_items = response.text.split("\n") if response.text else []
             if "Volume 1" in series_items:
-                response = client.get("/manga/Series%20A/Volume%201")
+                response = client.get("/comix/Series%20A/Volume%201")
                 assert response.status_code == 200
                 
                 # 6. 첫 번째 이미지 로드
                 volume_items = response.text.split("\n") if response.text else []
                 if volume_items:
                     first_image = volume_items[0]
-                    response = client.get(f"/manga/Series%20A/Volume%201/{quote(first_image)}")
+                    response = client.get(f"/comix/Series%20A/Volume%201/{quote(first_image)}")
                     assert response.status_code == 200
                     assert "image/" in response.headers["content-type"]
         
         # 7. 아카이브 파일 처리
         if "시리즈 B" in root_items:
-            response = client.get("/manga/시리즈%20B")
+            response = client.get("/comix/시리즈%20B")
             assert response.status_code == 200
             
             series_b_items = response.text.split("\n") if response.text else []
             for item in series_b_items:
                 if item.endswith(('.zip', '.cbz')):
                     # 아카이브 내용 조회
-                    response = client.get(f"/manga/시리즈%20B/{quote(item)}")
+                    response = client.get(f"/comix/시리즈%20B/{quote(item)}")
                     assert response.status_code == 200
                     
                     # 아카이브 내 첫 번째 이미지 로드
                     archive_items = response.text.split("\n") if response.text else []
                     if archive_items:
                         first_image = archive_items[0]
-                        response = client.get(f"/manga/시리즈%20B/{quote(item)}/{quote(first_image)}")
+                        response = client.get(f"/comix/시리즈%20B/{quote(item)}/{quote(first_image)}")
                         assert response.status_code == 200
                         assert "image/" in response.headers["content-type"]
                     break
@@ -398,16 +398,16 @@ class TestAirComixProtocolCompatibility:
         """응답 형식 호환성 테스트"""
         
         # 디렉토리 목록은 줄바꿈으로 구분된 텍스트여야 함
-        response = client.get("/manga/")
+        response = client.get("/comix/")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
         
         # 아카이브 목록도 줄바꿈으로 구분된 텍스트여야 함
-        response = client.get("/manga/시리즈%20B/Chapter%20001.zip")
+        response = client.get("/comix/시리즈%20B/Chapter%20001.zip")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
         
         # 이미지는 적절한 MIME 타입을 가져야 함
-        response = client.get("/manga/cover.png")
+        response = client.get("/comix/cover.png")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"

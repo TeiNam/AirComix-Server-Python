@@ -277,8 +277,8 @@ async def get_thumbnail_by_thm_extension(path: str):
         raise HTTPException(status_code=500, detail="썸네일 처리 실패")
 
 
-@router.get("/manga/{path:path}", response_model=None)
-async def handle_manga_request(path: str):
+@router.get("/comix/{path:path}", response_model=None)
+async def handle_comix_request(path: str):
     """만화 요청 처리 엔드포인트
     
     만화 디렉토리 내의 파일이나 디렉토리에 대한 모든 요청을 처리합니다.

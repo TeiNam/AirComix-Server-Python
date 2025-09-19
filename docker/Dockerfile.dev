@@ -1,39 +1,58 @@
 # Development Dockerfile for Comix Server Python Port
+# 개발 환경용 - 핫 리로드 및 디버깅 지원
+
 FROM python:3.11-slim as development
 
-# Set environment variables
+# 메타데이터 라벨
+LABEL maintainer="Comix Server Team" \
+      version="1.0.0-dev" \
+      description="Development environment for Comic book streaming server" \
+      org.opencontainers.image.source="https://github.com/comix-server/comix-server-python"
+
+# 개발 환경 변수 설정
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    COMIX_DEBUG_MODE=true \
+    COMIX_LOG_LEVEL=DEBUG \
+    COMIX_MANGA_DIRECTORY=/comix \
+    COMIX_SERVER_HOST=0.0.0.0 \
+    COMIX_SERVER_PORT=31257
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# 시스템 의존성 설치 (개발용 도구 포함)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     unrar-free \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    git \
+    vim \
+    htop \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Create application directory
+# 애플리케이션 디렉토리 생성
 WORKDIR /app
 
-# Copy requirements and install dependencies
+# 의존성 파일 복사 및 개발 의존성 설치
 COPY pyproject.toml ./
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install -e ".[dev]"
+    pip install -e ".[dev]" && \
+    pip cache purge
 
-# Copy application code
-COPY . .
+# 보안을 위한 비루트 사용자 생성
+RUN groupadd -r -g 1000 comix && \
+    useradd -r -u 1000 -g comix -d /app -s /bin/bash comix
 
-# Create non-root user
-RUN groupadd -r comix && useradd -r -g comix comix && \
-    chown -R comix:comix /app
+# 만화 디렉토리 생성
+RUN mkdir -p /comix && \
+    chown -R comix:comix /app /comix
 
-# Switch to non-root user
+# 비루트 사용자로 전환
 USER comix
 
-# Expose ports
+# 포트 노출 (애플리케이션 + 디버그)
 EXPOSE 31257 5678
 
-# Default development command
-CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257", "--reload"]
+# 개발용 기본 명령어 (핫 리로드 활성화)
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257", "--reload", "--log-level", "debug"]

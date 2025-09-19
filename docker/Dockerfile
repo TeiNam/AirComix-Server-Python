@@ -1,69 +1,85 @@
-# Comix Server Python Port - Docker Configuration
-# Multi-stage build for optimized production image
+# Comix Server Python Port - Production Docker Image
+# Multi-stage build for optimized production deployment
 
-# Build stage
+# Build stage - 의존성 설치 및 빌드
 FROM python:3.11-slim as builder
 
-# Set environment variables
+# 빌드 환경 변수 설정
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100
 
-# Install system dependencies for building
-RUN apt-get update && apt-get install -y \
+# 시스템 의존성 설치 (빌드용)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create and activate virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy requirements and install Python dependencies
-COPY pyproject.toml ./
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install .
-
-# Production stage
-FROM python:3.11-slim as production
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/opt/venv/bin:$PATH"
-
-# Install runtime system dependencies
-RUN apt-get update && apt-get install -y \
-    unrar-free \
+    gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy virtual environment from builder stage
+# 가상환경 생성 및 활성화
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# 의존성 파일 복사 및 설치
+COPY pyproject.toml ./
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install . && \
+    pip cache purge
+
+# Production stage - 실행 환경
+FROM python:3.11-slim as production
+
+# 메타데이터 라벨
+LABEL maintainer="Comix Server Team" \
+      version="1.0.0" \
+      description="Comic book streaming server compatible with AirComix iOS app" \
+      org.opencontainers.image.source="https://github.com/comix-server/comix-server-python"
+
+# 런타임 환경 변수 설정
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    COMIX_MANGA_DIRECTORY=/comix \
+    COMIX_SERVER_HOST=0.0.0.0 \
+    COMIX_SERVER_PORT=31257
+
+# 런타임 시스템 의존성 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unrar-free \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 빌드 스테이지에서 가상환경 복사
 COPY --from=builder /opt/venv /opt/venv
 
-# Create non-root user for security
-RUN groupadd -r comix && useradd -r -g comix comix
+# 보안을 위한 비루트 사용자 생성
+RUN groupadd -r -g 1000 comix && \
+    useradd -r -u 1000 -g comix -d /app -s /bin/bash comix
 
-# Create application directory
+# 애플리케이션 디렉토리 생성
 WORKDIR /app
 
-# Copy application code
-COPY app/ ./app/
-COPY README.md ./
+# 애플리케이션 코드 복사
+COPY --chown=comix:comix app/ ./app/
+COPY --chown=comix:comix README.md ./
 
-# Create manga directory and set permissions
-RUN mkdir -p /manga && \
-    chown -R comix:comix /app /manga
+# 만화 디렉토리 생성 및 권한 설정
+RUN mkdir -p /comix && \
+    chown comix:comix /comix
 
-# Switch to non-root user
+# 비루트 사용자로 전환
 USER comix
 
-# Expose port
+# 포트 노출
 EXPOSE 31257
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:31257/', timeout=5)" || exit 1
+# 헬스체크 설정
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:31257/health || exit 1
 
-# Default command
-CMD ["python", "-m", "app.main"]
+# 기본 실행 명령어
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257"]

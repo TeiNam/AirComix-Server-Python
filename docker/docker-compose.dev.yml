@@ -1,5 +1,6 @@
 # Development Docker Compose Configuration
-# Use this for development with hot-reload and debugging
+# 개발 환경용 - 핫 리로드 및 디버깅 지원
+
 version: '3.8'
 
 services:
@@ -8,44 +9,98 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.dev
       target: development
+    image: comix-server:dev
     container_name: comix-server-dev
-    restart: "no"
+    restart: "no"  # 개발 중에는 자동 재시작 비활성화
     
-    # Port mapping
+    # 포트 매핑
     ports:
-      - "${COMIX_SERVER_PORT:-31257}:31257"
-      - "5678:5678"  # Debug port
+      - "${COMIX_SERVER_PORT:-31257}:31257"  # 메인 서버 포트
+      - "${DEBUG_PORT:-5678}:5678"           # 디버그 포트
     
-    # Volume mounts for development
+    # 개발용 볼륨 마운트
     volumes:
-      # Mount source code for hot-reload
+      # 소스 코드 마운트 (핫 리로드용)
       - "../app:/app/app:rw"
       - "../tests:/app/tests:rw"
       - "../pyproject.toml:/app/pyproject.toml:ro"
+      - "../README.md:/app/README.md:ro"
       
-      # Mount manga collection
-      - "${MANGA_DIRECTORY:-../test_sample_data}:/manga:ro"
+      # 만화 컬렉션 마운트
+      - "${MANGA_DIRECTORY:-../examples/sample-data}:/comix:ro"
       
-      # Mount test data
-      - "../test_sample_data:/app/test_data:ro"
+      # 테스트 데이터 마운트
+      - "../examples:/app/examples:ro"
+      
+      # 개발용 설정 및 로그
+      - "./dev-config:/app/config:rw"
+      - "./dev-logs:/app/logs:rw"
     
-    # Environment variables for development
+    # 개발 환경 변수
     environment:
-      - COMIX_MANGA_DIRECTORY=/manga
+      # 서버 설정
+      - COMIX_MANGA_DIRECTORY=/comix
       - COMIX_SERVER_HOST=0.0.0.0
       - COMIX_SERVER_PORT=31257
       - COMIX_DEBUG_MODE=true
       - COMIX_LOG_LEVEL=DEBUG
+      
+      # Python 설정
       - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      
+      # 개발용 설정
+      - COMIX_RELOAD=true
+      - COMIX_DEV_MODE=true
+      
+      # 파일 필터링 (개발용 - 더 관대한 설정)
+      - COMIX_HIDDEN_FILES=.DS_Store,Thumbs.db
+      - COMIX_HIDDEN_PATTERNS=__MACOSX,*.tmp
     
-    # Development command with hot-reload
-    command: ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "31257", "--reload", "--log-level", "debug"]
+    # 개발용 명령어 (핫 리로드 활성화)
+    command: [
+      "uvicorn", 
+      "app.main:create_app", 
+      "--factory", 
+      "--host", "0.0.0.0", 
+      "--port", "31257", 
+      "--reload", 
+      "--reload-dir", "/app/app",
+      "--log-level", "debug"
+    ]
     
-    # Networks
+    # 개발용 헬스체크 (더 빠른 간격)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:31257/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 2
+      start_period: 30s
+    
+    # 개발용 네트워크
     networks:
       - comix-dev-network
+    
+    # 개발용 보안 설정 (더 관대함)
+    security_opt:
+      - no-new-privileges:true
+    
+    # stdin 및 tty 활성화 (디버깅용)
+    stdin_open: true
+    tty: true
 
+# 개발용 네트워크
 networks:
   comix-dev-network:
     driver: bridge
     name: comix-dev-network
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# 개발용 볼륨
+volumes:
+  dev-cache:
+    driver: local
+    name: comix-dev-cache

@@ -351,7 +351,7 @@ def run_performance_test_suite():
         "/",
         "/health",
         "/welcome.102",
-        "/manga/"
+        "/comix/"
     ]
     
     for endpoint in endpoints:

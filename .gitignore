@@ -29,6 +29,13 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Docker 관련
+docker/.env
+docker/dev-config/
+docker/dev-logs/
+docker/logs/
+docker/config/
+
 # 빌드 결과물
 dist/
 build/
@@ -37,6 +44,44 @@ out/
 # 로그 파일
 *.log
 logs/
+
+# Python 관련
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 가상환경
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
 # 캐시 파일
 .cache/

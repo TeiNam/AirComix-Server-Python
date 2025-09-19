@@ -73,7 +73,7 @@ class AirComixCompatibilityTester:
         for path in test_paths:
             encoded_path = quote(path, safe='/')
             try:
-                response = self.session.get(f"{self.base_url}/manga/{encoded_path}")
+                response = self.session.get(f"{self.base_url}/comix/{encoded_path}")
                 
                 content_lines = []
                 if response.status_code == 200:
@@ -100,7 +100,7 @@ class AirComixCompatibilityTester:
         for archive_path in archive_paths:
             encoded_path = quote(archive_path, safe='/')
             try:
-                response = self.session.get(f"{self.base_url}/manga/{encoded_path}")
+                response = self.session.get(f"{self.base_url}/comix/{encoded_path}")
                 
                 image_files = []
                 if response.status_code == 200:
@@ -128,7 +128,7 @@ class AirComixCompatibilityTester:
             encoded_path = quote(image_path, safe='/')
             try:
                 # HEAD 요청으로 헤더만 확인 (빠른 테스트)
-                response = self.session.head(f"{self.base_url}/manga/{encoded_path}")
+                response = self.session.head(f"{self.base_url}/comix/{encoded_path}")
                 
                 results[image_path] = {
                     'status_code': response.status_code,
@@ -148,7 +148,7 @@ class AirComixCompatibilityTester:
                 if response.status_code == 200:
                     try:
                         img_response = self.session.get(
-                            f"{self.base_url}/manga/{encoded_path}",
+                            f"{self.base_url}/comix/{encoded_path}",
                             headers={'Range': 'bytes=0-1023'},  # 첫 1KB만 요청
                             timeout=5
                         )
@@ -173,7 +173,7 @@ class AirComixCompatibilityTester:
             # URL 인코딩 테스트
             encoded_path = quote(path, safe='/')
             try:
-                response = self.session.get(f"{self.base_url}/manga/{encoded_path}")
+                response = self.session.get(f"{self.base_url}/comix/{encoded_path}")
                 
                 results[path] = {
                     'original_path': path,
@@ -257,26 +257,26 @@ def aircomix_tester():
 @pytest.fixture
 def sample_test_data(tmp_path):
     """테스트용 샘플 데이터 생성"""
-    manga_dir = tmp_path / "manga"
-    manga_dir.mkdir()
+    comix_dir = tmp_path / "comix"
+    comix_dir.mkdir()
     
     # 샘플 데이터 생성
-    sample_data = SampleDataGenerator.create_sample_manga_structure(manga_dir)
+    sample_data = SampleDataGenerator.create_sample_manga_structure(comix_dir)
     
     # 유니코드 파일명 테스트용 데이터 추가
-    unicode_dir = manga_dir / "한글 시리즈"
+    unicode_dir = comix_dir / "한글 시리즈"
     unicode_dir.mkdir()
     
     # 더미 파일 생성
     (unicode_dir / "1화.jpg").write_text("dummy image")
     (unicode_dir / "2화.jpg").write_text("dummy image")
     
-    japanese_dir = manga_dir / "日本語シリーズ"
+    japanese_dir = comix_dir / "日本語シリーズ"
     japanese_dir.mkdir()
     (japanese_dir / "第1話.jpg").write_text("dummy image")
     
     return {
-        'manga_dir': manga_dir,
+        'comix_dir': comix_dir,
         'sample_data': sample_data,
         'unicode_paths': [
             "한글 시리즈/",
@@ -404,7 +404,7 @@ class TestAirComixCompatibility:
         required_endpoints = [
             "/",
             "/welcome.102",
-            "/manga/",
+            "/comix/",
         ]
         
         for endpoint in required_endpoints:

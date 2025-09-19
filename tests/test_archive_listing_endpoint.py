@@ -19,7 +19,7 @@ class TestArchiveListingSimple:
         client = TestClient(app)
         
         # 존재하지 않는 아카이브 파일 요청
-        response = client.get("/manga/nonexistent.zip")
+        response = client.get("/comix/nonexistent.zip")
         
         # 404는 정상 (파일이 없음), 다른 오류는 엔드포인트 문제
         assert response.status_code in [200, 404, 403], f"Unexpected status: {response.status_code}"
@@ -32,7 +32,7 @@ class TestArchiveListingSimple:
         archive_extensions = ["zip", "cbz", "rar", "cbr"]
         
         for ext in archive_extensions:
-            response = client.get(f"/manga/test.{ext}")
+            response = client.get(f"/comix/test.{ext}")
             
             # 파일이 없어도 엔드포인트는 작동해야 함
             assert response.status_code in [200, 404, 403], f"Failed for .{ext} extension"
@@ -42,7 +42,7 @@ class TestArchiveListingSimple:
         app = create_app()
         client = TestClient(app)
         
-        response = client.get("/manga/Series%20A/Volume%201.zip")
+        response = client.get("/comix/Series%20A/Volume%201.zip")
         
         # 엔드포인트는 작동해야 함
         assert response.status_code in [200, 404, 403]
@@ -55,7 +55,7 @@ class TestArchiveListingSimple:
         case_variations = ["ZIP", "Zip", "zIp", "CBZ", "Cbz"]
         
         for ext in case_variations:
-            response = client.get(f"/manga/test.{ext}")
+            response = client.get(f"/comix/test.{ext}")
             
             # 엔드포인트는 작동해야 함
             assert response.status_code in [200, 404, 403], f"Failed for .{ext} extension"
@@ -67,10 +67,10 @@ class TestArchiveListingWithMocks:
     def test_zip_archive_listing(self, tmp_path):
         """ZIP 아카이브 목록 테스트"""
         # 테스트용 ZIP 파일 생성
-        manga_dir = tmp_path / "manga"
-        manga_dir.mkdir()
+        comix_dir = tmp_path / "comix"
+        comix_dir.mkdir()
         
-        zip_file = manga_dir / "test.zip"
+        zip_file = comix_dir / "test.zip"
         
         # ZIP 파일에 이미지 파일들 추가
         with zipfile.ZipFile(zip_file, 'w') as zf:
@@ -80,12 +80,12 @@ class TestArchiveListingWithMocks:
             zf.writestr("readme.txt", b"text file")  # 이미지가 아닌 파일
         
         with patch('app.models.config.settings') as mock_settings:
-            mock_settings.manga_directory = str(manga_dir)
+            mock_settings.manga_directory = str(comix_dir)
             
             app = create_app()
             client = TestClient(app)
             
-            response = client.get("/manga/test.zip")
+            response = client.get("/comix/test.zip")
             
             if response.status_code == 200:
                 assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -103,22 +103,22 @@ class TestArchiveListingWithMocks:
     
     def test_empty_archive_listing(self, tmp_path):
         """빈 아카이브 목록 테스트"""
-        manga_dir = tmp_path / "manga"
-        manga_dir.mkdir()
+        comix_dir = tmp_path / "comix"
+        comix_dir.mkdir()
         
-        zip_file = manga_dir / "empty.zip"
+        zip_file = comix_dir / "empty.zip"
         
         # 빈 ZIP 파일 생성
         with zipfile.ZipFile(zip_file, 'w') as zf:
             pass  # 빈 아카이브
         
         with patch('app.models.config.settings') as mock_settings:
-            mock_settings.manga_directory = str(manga_dir)
+            mock_settings.manga_directory = str(comix_dir)
             
             app = create_app()
             client = TestClient(app)
             
-            response = client.get("/manga/empty.zip")
+            response = client.get("/comix/empty.zip")
             
             if response.status_code == 200:
                 assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -127,10 +127,10 @@ class TestArchiveListingWithMocks:
     
     def test_archive_with_subdirectories(self, tmp_path):
         """서브디렉토리가 있는 아카이브 테스트"""
-        manga_dir = tmp_path / "manga"
-        manga_dir.mkdir()
+        comix_dir = tmp_path / "comix"
+        comix_dir.mkdir()
         
-        zip_file = manga_dir / "structured.zip"
+        zip_file = comix_dir / "structured.zip"
         
         # 디렉토리 구조가 있는 ZIP 파일 생성
         with zipfile.ZipFile(zip_file, 'w') as zf:
@@ -140,12 +140,12 @@ class TestArchiveListingWithMocks:
             zf.writestr("cover.jpg", b"cover image")
         
         with patch('app.models.config.settings') as mock_settings:
-            mock_settings.manga_directory = str(manga_dir)
+            mock_settings.manga_directory = str(comix_dir)
             
             app = create_app()
             client = TestClient(app)
             
-            response = client.get("/manga/structured.zip")
+            response = client.get("/comix/structured.zip")
             
             if response.status_code == 200:
                 assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -166,10 +166,10 @@ class TestArchiveListingWithMocks:
     
     def test_archive_with_korean_filenames(self, tmp_path):
         """한글 파일명이 있는 아카이브 테스트"""
-        manga_dir = tmp_path / "manga"
-        manga_dir.mkdir()
+        comix_dir = tmp_path / "comix"
+        comix_dir.mkdir()
         
-        zip_file = manga_dir / "korean.zip"
+        zip_file = comix_dir / "korean.zip"
         
         # 한글 파일명이 있는 ZIP 파일 생성
         with zipfile.ZipFile(zip_file, 'w') as zf:
@@ -178,12 +178,12 @@ class TestArchiveListingWithMocks:
             zf.writestr("표지.jpg", b"cover image")
         
         with patch('app.models.config.settings') as mock_settings:
-            mock_settings.manga_directory = str(manga_dir)
+            mock_settings.manga_directory = str(comix_dir)
             
             app = create_app()
             client = TestClient(app)
             
-            response = client.get("/manga/korean.zip")
+            response = client.get("/comix/korean.zip")
             
             if response.status_code == 200:
                 assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -203,8 +203,8 @@ class TestArchiveListingWithMocks:
         
         # 슬래시가 있는 경우와 없는 경우 모두 테스트
         paths = [
-            "/manga/test.zip",
-            "/manga/test.zip/"
+            "/comix/test.zip",
+            "/comix/test.zip/"
         ]
         
         for path in paths:
@@ -215,10 +215,10 @@ class TestArchiveListingWithMocks:
     
     def test_archive_mixed_file_types(self, tmp_path):
         """다양한 파일 타입이 혼재된 아카이브 테스트"""
-        manga_dir = tmp_path / "manga"
-        manga_dir.mkdir()
+        comix_dir = tmp_path / "comix"
+        comix_dir.mkdir()
         
-        zip_file = manga_dir / "mixed.zip"
+        zip_file = comix_dir / "mixed.zip"
         
         # 다양한 파일 타입이 있는 ZIP 파일 생성
         with zipfile.ZipFile(zip_file, 'w') as zf:
@@ -236,12 +236,12 @@ class TestArchiveListingWithMocks:
             zf.writestr("audio.mp3", b"audio file")
         
         with patch('app.models.config.settings') as mock_settings:
-            mock_settings.manga_directory = str(manga_dir)
+            mock_settings.manga_directory = str(comix_dir)
             
             app = create_app()
             client = TestClient(app)
             
-            response = client.get("/manga/mixed.zip")
+            response = client.get("/comix/mixed.zip")
             
             if response.status_code == 200:
                 assert response.headers["content-type"] == "text/plain; charset=utf-8"

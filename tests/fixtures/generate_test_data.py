@@ -73,7 +73,7 @@ def main():
         
         # 사용 예시 출력
         print("\n사용 예시:")
-        print(f"  export COMIX_MANGA_DIRECTORY={args.output_dir}/manga")
+        print(f"  export COMIX_MANGA_DIRECTORY={args.output_dir}/comix")
         print(f"  python -m pytest tests/ -v")
         
     except Exception as e:

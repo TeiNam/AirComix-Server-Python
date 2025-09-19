@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # 서버 설정
     manga_directory: Path = Field(
-        default=Path.home() / "manga",
+        default=Path.home() / "comix",
         description="만화 파일이 저장된 루트 디렉토리"
     )
     server_port: int = Field(

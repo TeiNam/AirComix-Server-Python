@@ -31,7 +31,7 @@ def test_file_info_directory():
     """디렉토리 FileInfo 테스트"""
     dir_info = FileInfo(
         name="manga",
-        path=Path("/test/manga"),
+        path=Path("/test/comix"),
         is_directory=True,
         is_archive=False,
         is_image=False
