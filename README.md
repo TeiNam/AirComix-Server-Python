@@ -56,16 +56,18 @@ python3 -m venv .venv
 source .venv/bin/activate  # Linux/macOS
 # .venv\Scripts\activate   # Windows
 
-# 설치
-pip install -e .
+# 개발 의존성 포함 설치
+pip install -e ".[dev]"
 
-# 환경 설정
-cp .env.example .env
-# .env 파일에서 COMIX_MANGA_DIRECTORY 설정
+# 테스트용 만화 디렉토리 생성
+mkdir -p /tmp/test-comix
+export COMIX_MANGA_DIRECTORY=/tmp/test-comix
 
 # 실행
-comix-server
+python -m app.main
 ```
+
+> 📖 **자세한 개발 가이드**: [DEVELOPMENT.md](DEVELOPMENT.md) 참조
 
 ## � 설정
 
