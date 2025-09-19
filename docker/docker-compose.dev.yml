@@ -9,8 +9,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.dev
       target: development
-    image: comix-server:dev
-    container_name: comix-server-dev
+    image: aircomix-server:dev
+    container_name: aircomix-server-dev
     restart: "no"  # 개발 중에는 자동 재시작 비활성화
     
     # 포트 매핑
@@ -85,7 +85,7 @@ services:
     
     # 개발용 네트워크
     networks:
-      - comix-dev-network
+      - aircomix-dev-network
     
     # 개발용 보안 설정 (더 관대함)
     security_opt:
@@ -97,9 +97,9 @@ services:
 
 # 개발용 네트워크
 networks:
-  comix-dev-network:
+  aircomix-dev-network:
     driver: bridge
-    name: comix-dev-network
+    name: aircomix-dev-network
     ipam:
       config:
         - subnet: 172.21.0.0/16
@@ -108,4 +108,4 @@ networks:
 volumes:
   dev-cache:
     driver: local
-    name: comix-dev-cache
+    name: aircomix-dev-cache

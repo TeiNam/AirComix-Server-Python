@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/[사용자명]/comix-server-python/workflows/Tests/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/test.yml)
 [![Docker Build](https://github.com/[사용자명]/comix-server-python/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/[사용자명]/comix-server-python/actions/workflows/docker-build.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/[사용자명]/comix-server)](https://hub.docker.com/r/[사용자명]/comix-server)
+[![Docker Pulls](https://img.shields.io/docker/pulls/[사용자명]/aircomix-server)](https://hub.docker.com/r/[사용자명]/aircomix-server)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
@@ -24,14 +24,14 @@ AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python �
 
 ```bash
 # Docker Hub에서 최신 이미지 가져오기
-docker pull [사용자명]/comix-server:latest
+docker pull [사용자명]/aircomix-server:latest
 
 # 간단한 실행 (만화 디렉토리를 /path/to/your/comix로 변경)
 docker run -d \
-  --name comix-server \
+  --name aircomix-server \
   -p 31257:31257 \
   -v /path/to/your/comix:/comix:ro \
-  [사용자명]/comix-server:latest
+  [사용자명]/aircomix-server:latest
 ```
 
 ### 소스에서 빌드 (권장)
@@ -134,14 +134,14 @@ docker-compose build
 
 ### Docker Hub
 ```bash
-docker pull [사용자명]/comix-server:latest
-docker pull [사용자명]/comix-server:dev
+docker pull [사용자명]/aircomix-server:latest
+docker pull [사용자명]/aircomix-server:dev
 ```
 
 ### GitHub Container Registry
 ```bash
-docker pull ghcr.io/[사용자명]/comix-server:latest
-docker pull ghcr.io/[사용자명]/comix-server:dev
+docker pull ghcr.io/[사용자명]/aircomix-server:latest
+docker pull ghcr.io/[사용자명]/aircomix-server:dev
 ```
 
 ### 환경 변수
@@ -163,13 +163,13 @@ docker pull ghcr.io/[사용자명]/comix-server:dev
 ```bash
 # 인증 활성화
 docker run -d \
-  --name comix-server \
+  --name aircomix-server \
   -p 31257:31257 \
   -v /path/to/your/comix:/comix:ro \
   -e COMIX_ENABLE_AUTH=true \
   -e COMIX_AUTH_USERNAME=admin \
   -e COMIX_AUTH_PASSWORD=secure_password_123 \
-  [사용자명]/comix-server:latest
+  [사용자명]/aircomix-server:latest
 ```
 
 **PHP 원본과 완전 호환**: 동일한 HTTP Basic Auth 방식으로 AirComix 앱에서 투명하게 작동합니다.

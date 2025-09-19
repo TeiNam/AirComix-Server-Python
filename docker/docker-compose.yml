@@ -9,8 +9,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
-    image: comix-server:latest
-    container_name: comix-server
+    image: aircomix-server:latest
+    container_name: aircomix-server
     restart: unless-stopped
     
     # 포트 매핑
@@ -87,25 +87,25 @@ services:
     
     # 네트워크 설정
     networks:
-      - comix-network
+      - aircomix-network
     
     # 의존성 (필요시 데이터베이스 등 추가)
     depends_on: []
 
 # 네트워크 정의
 networks:
-  comix-network:
+  aircomix-network:
     driver: bridge
-    name: comix-network
+    name: aircomix-network
     ipam:
       config:
         - subnet: 172.20.0.0/16
 
 # 볼륨 정의 (영구 데이터용)
 volumes:
-  comix-logs:
+  aircomix-logs:
     driver: local
-    name: comix-logs
-  comix-cache:
+    name: aircomix-logs
+  aircomix-cache:
     driver: local
-    name: comix-cache
+    name: aircomix-cache
