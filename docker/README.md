@@ -1,215 +1,123 @@
-# Comix Server Docker 배포 가이드
+# AirComix Server
 
-AirComix iOS 앱과 호환되는 만화책 스트리밍 서버의 Docker 배포 가이드입니다.
+AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버입니다. CBZ, CBR, ZIP, RAR 형식의 만화 파일을 지원하며, 이미지 리사이징과 썸네일 생성 기능을 제공합니다.
 
 ## 🚀 빠른 시작
 
-### 1. 저장소 클론
+### Docker Compose 사용 (권장)
+
 ```bash
-git clone https://github.com/comix-server/comix-server-python.git
-cd comix-server-python
+# docker-compose.yml 생성
+cat > docker-compose.yml << EOF
+version: '3.8'
+services:
+  aircomix:
+    image: aircomix/aircomix-server:latest
+    ports:
+      - "31257:8000"
+    volumes:
+      - /path/to/your/manga:/comix
+    environment:
+      - MANGA_DIRECTORY=/comix
+    restart: unless-stopped
+EOF
+
+# 서버 시작
+docker-compose up -d
 ```
 
-### 2. 환경 설정
+### Docker Run 사용
+
 ```bash
-# 환경 파일 생성
-cp docker/.env.example docker/.env
-
-# 만화 디렉토리 설정 (필수!)
-vim docker/.env  # MANGA_DIRECTORY를 실제 경로로 수정
+docker run -d \
+  --name aircomix-server \
+  -p 31257:8000 \
+  -v /path/to/your/manga:/comix \
+  -e MANGA_DIRECTORY=/comix \
+  --restart unless-stopped \
+  aircomix/aircomix-server:latest
 ```
 
-### 3. 서버 시작
+## 📋 환경 변수
+
+| 변수명 | 기본값 | 설명 |
+|--------|--------|------|
+| `MANGA_DIRECTORY` | `/comix` | 만화 파일이 있는 디렉토리 경로 (필수) |
+| `DEBUG_MODE` | `false` | 디버그 모드 활성화 |
+| `LOG_LEVEL` | `INFO` | 로그 레벨 (DEBUG, INFO, WARNING, ERROR) |
+| `HIDDEN_FILES` | `.DS_Store,Thumbs.db` | 숨김 파일 목록 |
+| `MAX_IMAGE_SIZE` | `10485760` | 최대 이미지 크기 (바이트) |
+
+## 🔐 인증 설정 (선택사항)
+
+HTTP Basic Authentication을 사용할 수 있습니다:
+
 ```bash
-# 자동 설정 및 시작
-make quick-start
-
-# 또는 단계별 실행
-make setup
-make run
+docker run -d \
+  --name aircomix-server \
+  -p 31257:8000 \
+  -v /path/to/your/manga:/comix \
+  -e MANGA_DIRECTORY=/comix \
+  -e ENABLE_AUTH=true \
+  -e AUTH_USERNAME=your_username \
+  -e AUTH_PASSWORD=your_password \
+  aircomix/aircomix-server:latest
 ```
 
-### 4. 접속 확인
-- 웹 브라우저에서 `http://localhost:31257` 접속
-- AirComix iOS 앱에서 서버 주소 설정
+## 📁 지원 파일 형식
 
-## 📋 주요 명령어
+### 압축 파일
+- **CBZ** (Comic Book ZIP)
+- **CBR** (Comic Book RAR)
+- **ZIP** 아카이브
+- **RAR** 아카이브
 
-### 기본 운영
-```bash
-make help          # 모든 명령어 확인
-make run           # 서버 시작
-make stop          # 서버 중지
-make restart       # 서버 재시작
-make logs          # 로그 확인
-make status        # 상태 확인
-```
+### 이미지 파일
+- JPEG, PNG, GIF, BMP, WebP
 
-### 개발 환경
-```bash
-make run-dev       # 개발 서버 시작 (핫 리로드)
-make logs-dev      # 개발 서버 로그
-make test          # 테스트 실행
-make shell-dev     # 개발 컨테이너 셸 접속
-```
+## 🌐 API 엔드포인트
 
-### 유지보수
-```bash
-make clean         # 불필요한 Docker 리소스 정리
-make update        # 최신 코드로 업데이트
-make health        # 서버 상태 확인
-```
-
-## ⚙️ 환경 설정
-
-### 필수 설정
-```bash
-# docker/.env 파일에서 설정
-MANGA_DIRECTORY=/path/to/your/manga  # 만화 디렉토리 (절대 경로)
-```
-
-### 선택적 설정
-```bash
-COMIX_SERVER_PORT=31257              # 서버 포트
-DEBUG_MODE=false                     # 디버그 모드
-LOG_LEVEL=INFO                       # 로그 레벨
-HIDDEN_FILES=.DS_Store,Thumbs.db     # 숨김 파일
-```
-
-## 📁 디렉토리 구조
-
-```
-docker/
-├── Dockerfile              # 프로덕션 이미지
-├── Dockerfile.dev          # 개발 이미지
-├── docker-compose.yml      # 프로덕션 구성
-├── docker-compose.dev.yml  # 개발 구성
-├── .env.example            # 환경 변수 템플릿
-├── .dockerignore           # Docker 빌드 제외 파일
-└── README.md               # 이 파일
-```
+- `GET /` - 루트 디렉토리 브라우징
+- `GET /browse/{path}` - 디렉토리 탐색
+- `GET /image/{path}` - 이미지 스트리밍
+- `GET /thumbnail/{path}` - 썸네일 생성
+- `GET /info/{path}` - 파일 정보 조회
+- `GET /health` - 헬스체크
 
 ## 🔧 고급 설정
 
-### 리소스 제한
-```bash
-# docker/.env에서 설정
-MEMORY_LIMIT=1G              # 메모리 제한
-CPU_LIMIT=2.0                # CPU 제한
-MEMORY_RESERVATION=512M      # 메모리 예약
-CPU_RESERVATION=1.0          # CPU 예약
+### 리소스 제한이 있는 Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  aircomix:
+    image: aircomix/aircomix-server:latest
+    ports:
+      - "31257:8000"
+    volumes:
+      - /path/to/your/manga:/comix
+    environment:
+      - MANGA_DIRECTORY=/comix
+      - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '1.0'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 ```
 
-### 로깅 설정
-```bash
-LOG_MAX_SIZE=10m             # 로그 파일 최대 크기
-LOG_MAX_FILES=5              # 로그 파일 최대 개수
-```
+### nginx 리버스 프록시
 
-### 성능 튜닝
-```bash
-MAX_IMAGE_SIZE=10485760      # 최대 이미지 크기 (10MB)
-CACHE_SIZE=100               # 캐시 크기
-```
-
-## 🐛 문제 해결
-
-### 일반적인 문제
-
-1. **만화 디렉토리 접근 불가**
-   ```bash
-   # 권한 확인
-   ls -la /path/to/your/manga
-   
-   # Docker 컨테이너에서 확인
-   make shell
-   ls -la /manga
-   ```
-
-2. **포트 충돌**
-   ```bash
-   # 다른 포트 사용
-   echo "COMIX_SERVER_PORT=31258" >> docker/.env
-   make restart
-   ```
-
-3. **메모리 부족**
-   ```bash
-   # 리소스 제한 조정
-   echo "MEMORY_LIMIT=2G" >> docker/.env
-   make restart
-   ```
-
-### 로그 확인
-```bash
-# 실시간 로그
-make logs
-
-# 특정 서비스 로그
-docker-compose -f docker/docker-compose.yml logs comix-server
-
-# 에러 로그만
-make logs | grep ERROR
-```
-
-### 컨테이너 디버깅
-```bash
-# 컨테이너 내부 접속
-make shell
-
-# 프로세스 확인
-docker exec comix-server ps aux
-
-# 네트워크 확인
-docker exec comix-server netstat -tlnp
-```
-
-## 🔒 보안 고려사항
-
-### 기본 보안 설정
-- 비루트 사용자로 실행
-- 읽기 전용 만화 디렉토리 마운트
-- 불필요한 권한 제거 (`no-new-privileges`)
-- 네트워크 격리
-
-### 추가 보안 강화
-```bash
-# 방화벽 설정 (예: UFW)
-sudo ufw allow 31257/tcp
-
-# SSL/TLS 설정 (리버스 프록시 사용 권장)
-# nginx, traefik 등을 통한 HTTPS 설정
-```
-
-## 📊 모니터링
-
-### 기본 모니터링
-```bash
-# 시스템 리소스 사용량
-docker stats comix-server
-
-# 헬스체크
-make health
-
-# 서비스 상태
-make status
-```
-
-### 고급 모니터링
-- Prometheus + Grafana 연동
-- 로그 수집 (ELK Stack)
-- 알림 설정 (Alertmanager)
-
-## 🚀 프로덕션 배포
-
-### 권장 구성
-1. **리버스 프록시** (nginx, traefik)
-2. **SSL/TLS 인증서** (Let's Encrypt)
-3. **로그 로테이션**
-4. **백업 전략**
-5. **모니터링 시스템**
-
-### 예제 nginx 설정
 ```nginx
 server {
     listen 80;
@@ -219,16 +127,76 @@ server {
         proxy_pass http://localhost:31257;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
+## 📊 모니터링
+
+### 헬스체크
+```bash
+curl http://localhost:31257/health
+```
+
+### 로그 확인
+```bash
+# Docker Compose
+docker-compose logs -f aircomix
+
+# Docker Run
+docker logs -f aircomix-server
+```
+
+### 리소스 사용량
+```bash
+docker stats aircomix-server
+```
+
+## 🐛 문제 해결
+
+### 일반적인 문제
+
+1. **만화 디렉토리 접근 불가**
+   - 볼륨 마운트 경로 확인: `-v /correct/path:/comix`
+   - 디렉토리 권한 확인: `ls -la /path/to/your/manga`
+   - **주의**: 읽기 전용(`:ro`) 마운트 시 구동 에러 발생 가능
+
+2. **포트 충돌**
+   - 다른 포트 사용: `-p 31258:8000`
+
+3. **메모리 부족**
+   - 메모리 제한 증가: `--memory=2g`
+
+### 디버깅
+
+```bash
+# 컨테이너 내부 접속
+docker exec -it aircomix-server /bin/bash
+
+# 환경 변수 확인
+docker exec aircomix-server env | grep MANGA
+
+# 마운트된 디렉토리 확인
+docker exec aircomix-server ls -la /comix
+
+# 프로세스 확인
+docker exec aircomix-server ps aux
+```
+
+## 🏷️ 태그
+
+- `latest` - 최신 안정 버전
+- `v1.x.x` - 특정 버전
+- `dev` - 개발 버전 (불안정)
+
 ## 📞 지원
 
-- **이슈 리포트**: [GitHub Issues](https://github.com/comix-server/comix-server-python/issues)
-- **문서**: [프로젝트 문서](../docs/)
-- **커뮤니티**: [Discussions](https://github.com/comix-server/comix-server-python/discussions)
+- **GitHub**: [aircomix/aircomix-server](https://github.com/aircomix/aircomix-server)
+- **Issues**: [버그 리포트 및 기능 요청](https://github.com/aircomix/aircomix-server/issues)
+- **Documentation**: [전체 문서](https://github.com/aircomix/aircomix-server/tree/main/docs)
 
 ## 📄 라이선스
 
-MIT License - 자세한 내용은 [LICENSE](../LICENSE) 파일을 참조하세요.
+MIT License
