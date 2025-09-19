@@ -4,6 +4,10 @@ Comix Server 메인 애플리케이션
 FastAPI 애플리케이션 생성 및 설정
 """
 
+# .env 파일 로드 (다른 import보다 먼저)
+from dotenv import load_dotenv
+load_dotenv()
+
 import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator

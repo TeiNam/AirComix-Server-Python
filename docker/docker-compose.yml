@@ -36,8 +36,8 @@ services:
       - COMIX_LOG_LEVEL=${LOG_LEVEL:-INFO}
       
       # 파일 필터링 (선택사항)
-      - COMIX_HIDDEN_FILES=${HIDDEN_FILES:-.DS_Store,Thumbs.db,@eaDir}
-      - COMIX_HIDDEN_PATTERNS=${HIDDEN_PATTERNS:-__MACOSX}
+      - COMIX_HIDDEN_FILES=${COMIX_HIDDEN_FILES:-[".", "..", "@eaDir", "Thumbs.db", ".DS_Store", ".thumbnails", "*.thm"]}
+      - COMIX_HIDDEN_PATTERNS=${COMIX_HIDDEN_PATTERNS:-["__MACOSX"]}
       
       # 지원 파일 형식 (선택사항)
       - COMIX_IMAGE_EXTENSIONS=${IMAGE_EXTENSIONS:-jpg,jpeg,png,gif,bmp,webp}
@@ -48,9 +48,8 @@ services:
       - COMIX_CACHE_SIZE=${CACHE_SIZE:-100}
       
       # 인증 설정
-      - COMIX_ENABLE_AUTH=${ENABLE_AUTH:-false}
-      - COMIX_AUTH_USERNAME=${AUTH_USERNAME}
-      - COMIX_AUTH_PASSWORD=${AUTH_PASSWORD}
+      - COMIX_ENABLE_AUTH=${COMIX_ENABLE_AUTH:-false}
+      - COMIX_AUTH_PASSWORD=${COMIX_AUTH_PASSWORD}
       
       # Python 경로 설정
       - PYTHONPATH=/app
