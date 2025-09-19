@@ -8,7 +8,7 @@ GitHub 저장소의 Settings > Secrets and variables > Actions에서 다음 secr
 
 ### Docker Hub 배포용
 - `DOCKER_USERNAME`: Docker Hub 사용자명
-- `DOCKER_PASSWORD`: Docker Hub 액세스 토큰 (비밀번호 대신 토큰 사용 권장)
+- `DOCKER_TOKEN`: Docker Hub 액세스 토큰
 
 ### Docker Hub 액세스 토큰 생성 방법
 1. [Docker Hub](https://hub.docker.com)에 로그인
