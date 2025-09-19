@@ -22,8 +22,8 @@ jobs:
       uses: docker/login-action@v3
       with:
         registry: docker.io
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_TOKEN }}
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@v3
@@ -48,10 +48,10 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: true
         tags: |
-          docker.io/${{ secrets.DOCKER_USERNAME }}/comix-server:latest
-          docker.io/${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.version }}
-          docker.io/${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.major_minor }}
-          docker.io/${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.major }}
+          docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comix-server:latest
+          docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comix-server:${{ steps.version.outputs.version }}
+          docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comix-server:${{ steps.version.outputs.major_minor }}
+          docker.io/${{ secrets.DOCKERHUB_USERNAME }}/comix-server:${{ steps.version.outputs.major }}
         labels: |
           org.opencontainers.image.title=Comix Server
           org.opencontainers.image.description=Comic book streaming server compatible with AirComix iOS app
@@ -95,8 +95,8 @@ jobs:
         echo "" >> release_notes.md
         echo "### Docker Hub" >> release_notes.md
         echo '```bash' >> release_notes.md
-        echo "docker pull ${{ secrets.DOCKER_USERNAME }}/comix-server:${{ steps.version.outputs.version }}" >> release_notes.md
-        echo "docker pull ${{ secrets.DOCKER_USERNAME }}/comix-server:latest" >> release_notes.md
+        echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/comix-server:${{ steps.version.outputs.version }}" >> release_notes.md
+        echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/comix-server:latest" >> release_notes.md
         echo '```' >> release_notes.md
         echo "" >> release_notes.md
         echo "### GitHub Container Registry" >> release_notes.md

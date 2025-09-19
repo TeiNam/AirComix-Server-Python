@@ -7,8 +7,8 @@
 GitHub 저장소의 Settings > Secrets and variables > Actions에서 다음 secrets을 설정해야 합니다:
 
 ### Docker Hub 배포용
-- `DOCKER_USERNAME`: Docker Hub 사용자명
-- `DOCKER_TOKEN`: Docker Hub 액세스 토큰
+- `DOCKERHUB_USERNAME`: Docker Hub 사용자명
+- `DOCKERHUB_TOKEN`: Docker Hub 액세스 토큰
 
 ### Docker Hub 액세스 토큰 생성 방법
 1. [Docker Hub](https://hub.docker.com)에 로그인
