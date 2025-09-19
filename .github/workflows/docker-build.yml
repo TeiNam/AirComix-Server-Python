@@ -68,9 +68,24 @@ jobs:
       id: version
       run: |
         if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # 태그에서 빌드하는 경우
           VERSION=${GITHUB_REF#refs/tags/}
         else
-          VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-$(date +%Y%m%d)")
+          # 브랜치에서 빌드하는 경우 - 최신 태그 기반으로 버전 생성
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.9.0")
+          if [[ $GITHUB_REF == refs/heads/main ]]; then
+            # main 브랜치: 다음 버전 미리보기
+            VERSION_NUM=${LATEST_TAG#v}
+            IFS='.' read -ra VERSION_PARTS <<< "$VERSION_NUM"
+            MAJOR=${VERSION_PARTS[0]:-1}
+            MINOR=${VERSION_PARTS[1]:-0}
+            PATCH=${VERSION_PARTS[2]:-0}
+            NEXT_PATCH=$((PATCH + 1))
+            VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}-preview"
+          else
+            # 다른 브랜치: dev 버전
+            VERSION="${LATEST_TAG}-dev-$(git rev-parse --short HEAD)"
+          fi
         fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
@@ -87,6 +102,7 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value=${{ steps.version.outputs.version }},enable=true
         labels: |
           org.opencontainers.image.title=AirComix Server
           org.opencontainers.image.description=Comic book streaming server compatible with AirComix iOS app

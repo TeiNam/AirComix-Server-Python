@@ -129,8 +129,9 @@ docker-compose build
 | 태그 | 설명 | 플랫폼 |
 |------|------|--------|
 | `latest` | 최신 안정 버전 | linux/amd64, linux/arm64 |
+| `v1.0.0` | 특정 버전 (권장) | linux/amd64, linux/arm64 |
+| `v1.0.0-preview` | 다음 버전 미리보기 | linux/amd64, linux/arm64 |
 | `dev` | 개발 버전 | linux/amd64, linux/arm64 |
-| `v1.0.0` | 특정 버전 | linux/amd64, linux/arm64 |
 
 ### Docker Hub
 ```bash
