@@ -16,6 +16,7 @@ from app.models.config import settings
 from app.utils.logging import get_logger, setup_logging
 from app.exception_handlers import register_exception_handlers
 from app.services import FileWatcherService, ThumbnailService, ArchiveService
+from app.middleware import BasicAuthMiddleware
 
 
 @asynccontextmanager
@@ -64,6 +65,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         debug=settings.debug_mode,
     )
+    
+    # 인증 미들웨어 설정
+    if settings.enable_auth:
+        app.add_middleware(BasicAuthMiddleware)
+        logger.info("Basic Auth 미들웨어 활성화됨")
+        logger.info(f"인증 사용자: {settings.auth_username}")
     
     # CORS 미들웨어 설정 (디버그 모드에서만)
     if settings.debug_mode:

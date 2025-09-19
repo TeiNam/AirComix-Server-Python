@@ -7,7 +7,6 @@ FROM python:3.11-slim as builder
 # 빌드 환경 변수 설정
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=100
 
@@ -23,11 +22,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 의존성 파일 복사 및 설치
+# 먼저 의존성 파일만 복사하여 레이어 캐싱 최적화
 COPY pyproject.toml ./
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install . && \
-    pip cache purge
+
+# 기본 의존성만 먼저 설치 (소스 코드 변경 시 캐시 활용)
+RUN pip install --upgrade pip setuptools wheel
+
+# 소스 코드 복사
+COPY app/ ./app/
+COPY README.md ./
+
+# 패키지 설치 및 캐시 정리
+RUN pip install . && \
+    rm -rf ~/.cache/pip /tmp/pip-* || true
 
 # Production stage - 실행 환경
 FROM python:3.11-slim as production

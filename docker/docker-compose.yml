@@ -46,6 +46,11 @@ services:
       # 성능 설정
       - COMIX_MAX_IMAGE_SIZE=${MAX_IMAGE_SIZE:-10485760}  # 10MB
       - COMIX_CACHE_SIZE=${CACHE_SIZE:-100}
+      
+      # 인증 설정
+      - COMIX_ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - COMIX_AUTH_USERNAME=${AUTH_USERNAME}
+      - COMIX_AUTH_PASSWORD=${AUTH_PASSWORD}
     
     # 리소스 제한 (필요에 따라 조정)
     deploy:

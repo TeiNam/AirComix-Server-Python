@@ -100,6 +100,24 @@ class Settings(BaseSettings):
         description="welcome 엔드포인트에서 반환할 메시지"
     )
     
+    # 인증 설정
+    enable_auth: bool = Field(
+        default=False,
+        description="기본 인증 활성화 여부"
+    )
+    auth_username: Optional[str] = Field(
+        default=None,
+        description="기본 인증 사용자명"
+    )
+    auth_password: Optional[str] = Field(
+        default=None,
+        description="기본 인증 패스워드"
+    )
+    htpasswd_file: Optional[Path] = Field(
+        default=None,
+        description=".htpasswd 파일 경로 (Apache ��환성)"
+    )
+    
     model_config = ConfigDict(
         env_file=".env",
         env_prefix="COMIX_",
@@ -170,6 +188,15 @@ class Settings(BaseSettings):
             raise ValueError("최소 하나의 폴백 인코딩이 필요합니다")
         return v
     
+    @field_validator("auth_username", "auth_password")
+    @classmethod
+    def validate_auth_credentials(cls, v, info):
+        """인증 자격 증명 검증"""
+        # enable_auth가 True인 경우에만 검증
+        # 하지만 이 시점에서는 다른 필드에 접근할 수 없으므로
+        # 런타임에서 별도로 검증해야 함
+        return v
+    
     @property
     def supported_extensions(self) -> List[str]:
         """지원되는 모든 파일 확장자 반환"""
@@ -201,7 +228,28 @@ class Settings(BaseSettings):
                 return True
         
         return False
+    
+    def validate_auth_settings(self) -> None:
+        """인증 설정 검증"""
+        if self.enable_auth:
+            if not self.auth_username:
+                raise ValueError("인증이 활성화된 경우 auth_username이 필요합니다")
+            if not self.auth_password:
+                raise ValueError("인증이 활성화된 경우 auth_password가 필요합니다")
+            if len(self.auth_username) < 3:
+                raise ValueError("사용자명은 최소 3자 이상이어야 합니다")
+            if len(self.auth_password) < 6:
+                raise ValueError("패스워드는 최소 6자 이상이어야 합니다")
 
 
 # 전역 설정 인스턴스
 settings = Settings()
+
+# 인증 설정 검증
+try:
+    settings.validate_auth_settings()
+except ValueError as e:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.error(f"인증 설정 오류: {e}")
+    raise

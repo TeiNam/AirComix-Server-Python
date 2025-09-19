@@ -150,6 +150,27 @@ docker pull ghcr.io/[사용자명]/comix-server:dev
 | `COMIX_SERVER_PORT` | `31257` | 서버 포트 |
 | `COMIX_DEBUG_MODE` | `false` | 디버그 모드 |
 | `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 |
+| `COMIX_ENABLE_AUTH` | `false` | 기본 인증 활성화 |
+| `COMIX_AUTH_USERNAME` | - | 인증 사용자명 (인증 활성화 시 필수) |
+| `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 (인증 활성화 시 필수) |
+
+### 인증 설정
+
+보안이 필요한 환경에서는 HTTP Basic Authentication을 활성화할 수 있습니다:
+
+```bash
+# 인증 활성화
+docker run -d \
+  --name comix-server \
+  -p 31257:31257 \
+  -v /path/to/your/comix:/comix:ro \
+  -e COMIX_ENABLE_AUTH=true \
+  -e COMIX_AUTH_USERNAME=admin \
+  -e COMIX_AUTH_PASSWORD=secure_password_123 \
+  [사용자명]/comix-server:latest
+```
+
+**PHP 원본과 완전 호환**: 동일한 HTTP Basic Auth 방식으로 AirComix 앱에서 투명하게 작동합니다.
 
 ## 📄 라이선스
 

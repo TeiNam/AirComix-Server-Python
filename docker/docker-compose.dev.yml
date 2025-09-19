@@ -57,6 +57,11 @@ services:
       # 파일 필터링 (개발용 - 더 관대한 설정)
       - COMIX_HIDDEN_FILES=.DS_Store,Thumbs.db
       - COMIX_HIDDEN_PATTERNS=__MACOSX,*.tmp
+      
+      # 인증 설정 (개발용)
+      - COMIX_ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - COMIX_AUTH_USERNAME=${AUTH_USERNAME:-admin}
+      - COMIX_AUTH_PASSWORD=${AUTH_PASSWORD:-password123}
     
     # 개발용 명령어 (핫 리로드 활성화)
     command: [

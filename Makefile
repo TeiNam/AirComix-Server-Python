@@ -139,6 +139,22 @@ test: ## Docker 컨테이너에서 테스트 실행
 	@cd docker && docker-compose -f docker-compose.dev.yml run --rm comix-server-dev python -m pytest
 	@echo "✅ 테스트 완료"
 
+test-build: ## Docker 이미지 빌드 테스트
+	@echo "🐳 Docker 빌드 테스트 실행 중..."
+	@./scripts/quick-docker-test.sh
+	@echo "✅ 빌드 테스트 완료"
+
+test-build-full: ## 전체 Docker 빌드 테스트 (상세)
+	@echo "🐳 전체 Docker 빌드 테스트 실행 중..."
+	@./scripts/test-docker-build.sh
+	@echo "✅ 전체 빌드 테스트 완료"
+
+test-auth: ## 인증 기능 테스트
+	@echo "🔐 인증 기능 테스트 실행 중..."
+	@chmod +x scripts/test-auth.sh
+	@./scripts/test-auth.sh
+	@echo "✅ 인증 테스트 완료"
+
 test-cov: ## 커버리지와 함께 테스트 실행
 	@echo "🧪 커버리지 테스트 실행 중..."
 	@cd docker && docker-compose -f docker-compose.dev.yml run --rm comix-server-dev python -m pytest --cov=app --cov-report=html
