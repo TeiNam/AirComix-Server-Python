@@ -17,7 +17,6 @@ NC='\033[0m' # No Color
 
 # 테스트 설정
 TEST_PORT=31258
-TEST_USERNAME="testuser"
 TEST_PASSWORD="testpass123"
 SERVER_URL="http://localhost:${TEST_PORT}"
 
@@ -56,7 +55,6 @@ echo -e "${YELLOW}인증 활성화 상태로 서버 시작 중...${NC}"
 COMIX_MANGA_DIRECTORY="/tmp" \
 COMIX_SERVER_PORT=${TEST_PORT} \
 COMIX_ENABLE_AUTH=true \
-COMIX_AUTH_USERNAME=${TEST_USERNAME} \
 COMIX_AUTH_PASSWORD=${TEST_PASSWORD} \
 python -m app.main &
 SERVER_PID=$!
@@ -74,15 +72,15 @@ fi
 
 # 잘못된 인증으로 접근 테스트
 echo -e "${YELLOW}잘못된 인증으로 접근 테스트...${NC}"
-if curl -s -f -u "wrong:password" "${SERVER_URL}/health" > /dev/null; then
+if curl -s -f -u "any:wrongpassword" "${SERVER_URL}/" > /dev/null; then
     echo -e "${RED}❌ 잘못된 인증으로 접근 성공 (문제!)${NC}"
 else
     echo -e "${GREEN}✅ 잘못된 인증 차단됨 (정상)${NC}"
 fi
 
-# 올바른 인증으로 접근 테스트
-echo -e "${YELLOW}올바른 인증으로 접근 테스트...${NC}"
-if curl -s -f -u "${TEST_USERNAME}:${TEST_PASSWORD}" "${SERVER_URL}/health" > /dev/null; then
+# 올바른 인증으로 접근 테스트 (.htaccess 방식: 사용자명은 무시됨)
+echo -e "${YELLOW}올바른 인증으로 접근 테스트 (.htaccess 방식)...${NC}"
+if curl -s -f -u "any:${TEST_PASSWORD}" "${SERVER_URL}/" > /dev/null; then
     echo -e "${GREEN}✅ 올바른 인증으로 접근 성공${NC}"
 else
     echo -e "${RED}❌ 올바른 인증으로 접근 실패${NC}"
@@ -108,5 +106,5 @@ echo -e "${GREEN}🎉 인증 기능 테스트 완료!${NC}"
 echo ""
 echo -e "${BLUE}사용법:${NC}"
 echo "1. 인증 비활성화: COMIX_ENABLE_AUTH=false"
-echo "2. 인증 활성화: COMIX_ENABLE_AUTH=true + USERNAME/PASSWORD 설정"
-echo "3. AirComix 앱에서 동일한 사용자명/패스워드로 로그인"
+echo "2. 인증 활성화: COMIX_ENABLE_AUTH=true + AUTH_PASSWORD 설정"
+echo "3. AirComix 앱에서 패스워드만 입력 (.htaccess 방식)"

@@ -105,13 +105,10 @@ class Settings(BaseSettings):
         default=False,
         description="기본 인증 활성화 여부"
     )
-    auth_username: Optional[str] = Field(
-        default=None,
-        description="기본 인증 사용자명"
-    )
+
     auth_password: Optional[str] = Field(
         default=None,
-        description="기본 인증 패스워드"
+        description="기본 인증 패스워드 (.htaccess 방식)"
     )
     htpasswd_file: Optional[Path] = Field(
         default=None,
@@ -194,10 +191,10 @@ class Settings(BaseSettings):
             raise ValueError("최소 하나의 폴백 인코딩이 필요합니다")
         return v
     
-    @field_validator("auth_username", "auth_password")
+    @field_validator("auth_password")
     @classmethod
-    def validate_auth_credentials(cls, v, info):
-        """인증 자격 증명 검증"""
+    def validate_auth_password(cls, v, info):
+        """인증 패스워드 검증 (.htaccess 방식)"""
         # enable_auth가 True인 경우에만 검증
         # 하지만 이 시점에서는 다른 필드에 접근할 수 없으므로
         # 런타임에서 별도로 검증해야 함
@@ -244,12 +241,8 @@ class Settings(BaseSettings):
             return
             
         if self.enable_auth:
-            if not self.auth_username:
-                raise ValueError("인증이 활성화된 경우 auth_username이 필요합니다")
             if not self.auth_password:
                 raise ValueError("인증이 활성화된 경우 auth_password가 필요합니다")
-            if len(self.auth_username) < 3:
-                raise ValueError("사용자명은 최소 3자 이상이어야 합니다")
             if len(self.auth_password) < 6:
                 raise ValueError("패스워드는 최소 6자 이상이어야 합니다")
 

@@ -52,10 +52,14 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
             
             # Base64 디코딩
             decoded = base64.b64decode(credentials).decode("utf-8")
-            username, password = decoded.split(":", 1)
+            # .htaccess 방식: 패스워드만 확인 (username:password 형태에서 password 부분만 사용)
+            if ":" in decoded:
+                _, password = decoded.split(":", 1)
+            else:
+                password = decoded
             
-            # 자격 증명 확인
-            if not self._verify_credentials(username, password):
+            # 패스워드 확인
+            if not self._verify_password(password):
                 return self._unauthorized_response()
             
         except (ValueError, UnicodeDecodeError):
@@ -64,16 +68,13 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         # 인증 성공, 요청 계속 처리
         return await call_next(request)
     
-    def _verify_credentials(self, username: str, password: str) -> bool:
-        """자격 증명 확인"""
-        if not settings.auth_username or not settings.auth_password:
+    def _verify_password(self, password: str) -> bool:
+        """패스워드 확인 (.htaccess 방식)"""
+        if not settings.auth_password:
             return False
         
         # 타이밍 공격 방지를 위한 상수 시간 비교
-        username_correct = secrets.compare_digest(username, settings.auth_username)
-        password_correct = secrets.compare_digest(password, settings.auth_password)
-        
-        return username_correct and password_correct
+        return secrets.compare_digest(password, settings.auth_password)
     
     def _unauthorized_response(self) -> Response:
         """401 Unauthorized 응답 생성"""
@@ -84,8 +85,8 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         )
 
 
-def get_basic_auth_credentials(request: Request) -> Optional[Tuple[str, str]]:
-    """요청에서 Basic Auth 자격 증명 추출"""
+def get_basic_auth_password(request: Request) -> Optional[str]:
+    """요청에서 Basic Auth 패스워드 추출 (.htaccess 방식)"""
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         return None
@@ -96,41 +97,43 @@ def get_basic_auth_credentials(request: Request) -> Optional[Tuple[str, str]]:
             return None
         
         decoded = base64.b64decode(credentials).decode("utf-8")
-        username, password = decoded.split(":", 1)
-        return username, password
+        # .htaccess 방식: 패스워드만 사용
+        if ":" in decoded:
+            _, password = decoded.split(":", 1)
+        else:
+            password = decoded
+        return password
     
     except (ValueError, UnicodeDecodeError):
         return None
 
 
-def verify_auth(username: str, password: str) -> bool:
-    """인증 자격 증명 확인"""
+def verify_auth_password(password: str) -> bool:
+    """패스워드 인증 확인 (.htaccess 방식)"""
     if not settings.enable_auth:
         return True
     
-    if not settings.auth_username or not settings.auth_password:
+    if not settings.auth_password:
         return False
     
     # 타이밍 공격 방지를 위한 상수 시간 비교
-    username_correct = secrets.compare_digest(username, settings.auth_username)
-    password_correct = secrets.compare_digest(password, settings.auth_password)
-    
-    return username_correct and password_correct
+    return secrets.compare_digest(password, settings.auth_password)
 
 
 # FastAPI Dependency로 사용할 수 있는 인증 함수
 security = HTTPBasic()
 
 def get_current_user(credentials: HTTPBasicCredentials = security):
-    """현재 사용자 인증 (FastAPI Dependency)"""
+    """현재 사용자 인증 (FastAPI Dependency) - .htaccess 방식"""
     if not settings.enable_auth:
         return "anonymous"
     
-    if not verify_auth(credentials.username, credentials.password):
+    # .htaccess 방식: 패스워드만 확인
+    if not verify_auth_password(credentials.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Basic"},
         )
     
-    return credentials.username
+    return "authenticated"
