@@ -16,10 +16,15 @@ services:
     ports:
       - "31257:31257"
     volumes:
-      - /path/to/your/manga:/comix
+      - /path/to/your/manga:/comix:ro
+      # 썸네일 캐시 (없으면 컨테이너를 다시 만들 때마다 재생성된다)
+      - aircomix-cache:/app/cache
     environment:
       - COMIX_MANGA_DIRECTORY=/comix
     restart: unless-stopped
+
+volumes:
+  aircomix-cache:
 EOF
 
 # 서버 시작
@@ -29,14 +34,21 @@ docker-compose up -d
 ### Docker Run 사용
 
 ```bash
+docker volume create aircomix-cache
+
 docker run -d \
   --name aircomix-server \
   -p 31257:31257 \
-  -v /path/to/your/manga:/comix \
+  -v /path/to/your/manga:/comix:ro \
+  -v aircomix-cache:/app/cache \
   -e COMIX_MANGA_DIRECTORY=/comix \
   --restart unless-stopped \
   aircomix/aircomix-server:latest
 ```
+
+> 썸네일 캐시 기본 경로는 이미지에 `/app/cache` 로 설정되어 있습니다.
+> 만화 디렉토리를 쓰기 가능하게 마운트하고 예전처럼 그 안에 캐시를 두려면
+> `-e COMIX_THUMBNAIL_CACHE_DIRECTORY=/comix/.thumbnails` 를 지정하세요.
 
 ## 📋 환경 변수
 
@@ -108,7 +120,8 @@ services:
     ports:
       - "31257:31257"
     volumes:
-      - /path/to/your/manga:/comix
+      - /path/to/your/manga:/comix:ro
+      - aircomix-cache:/app/cache
     environment:
       - COMIX_MANGA_DIRECTORY=/comix
       - COMIX_LOG_LEVEL=INFO
@@ -126,6 +139,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+volumes:
+  aircomix-cache:
 ```
 
 ### nginx 리버스 프록시
