@@ -5,7 +5,7 @@ A high-performance streaming server for comic books and manga,
 compatible with the AirComix iOS app.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.2"
 __author__ = "Comix Server Team"
 
 # 주요 컴포넌트 임포트

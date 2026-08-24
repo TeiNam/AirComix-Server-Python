@@ -8,7 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 
 # 메타데이터 라벨
 LABEL maintainer="Comix Server Team" \
-      version="1.0.0-dev" \
+      version="1.0.2-dev" \
       description="Development environment for Comic book streaming server" \
       org.opencontainers.image.source="https://github.com/comix-server/comix-server-python"
 
