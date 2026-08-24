@@ -1,15 +1,15 @@
 # Comix Server Python Port
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![AirComix Compatible](https://img.shields.io/badge/AirComix-100%25%20Compatible-blue?style=for-the-badge)](https://apps.apple.com/app/aircomix/)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![AirComix Compatible](https://img.shields.io/badge/AirComix-100%25%20Compatible-blue?style=for-the-badge)
 
 AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python 포트입니다. 기존 PHP 서버를 FastAPI로 재구현하여 더 나은 성능과 안정성을 제공합니다.
 
 ## Docker Repository
-- https://hub.docker.com/r/teinam/aircomix-server 
 
+- [https://hub.docker.com/r/teinam/aircomix-server](https://hub.docker.com/r/teinam/aircomix-server)
 
 ## ✨ 주요 개선사항
 
@@ -25,22 +25,22 @@ AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버의 Python �
 
 ```bash
 # Docker Hub에서 최신 이미지 가져오기
-docker pull [사용자명]/aircomix-server:latest
+docker pull teinam/aircomix-server:1.0.2
 
 # 간단한 실행 (만화 디렉토리를 /path/to/your/comix로 변경)
 docker run -d \
   --name aircomix-server \
   -p 31257:31257 \
   -v /path/to/your/comix:/comix:ro \
-  [사용자명]/aircomix-server:latest
+  teinam/aircomix-server:1.0.2
 ```
 
 ### 소스에서 빌드 (권장)
 
 ```bash
 # 저장소 클론
-git clone https://github.com/[사용자명]/comix-server-python.git
-cd comix-server-python
+git clone https://github.com/TeiNam/AirComix-Server-Python.git
+cd AirComix-Server-Python
 
 # 빠른 시작 (자동 설정 및 실행)
 make quick-start
@@ -116,48 +116,57 @@ docker-compose build
 
 ## 🌐 API 엔드포인트
 
-| 엔드포인트 | 설명 |
-|------------|------|
-| `/` | 만화 디렉토리 이름 반환 |
-| `/welcome.102` | 서버 기능 정보 |
-| `/health` | 서버 상태 확인 |
+
+| 엔드포인트           | 설명                     |
+| --------------- | ---------------------- |
+| `/`             | 만화 디렉토리 이름 반환          |
+| `/welcome.102`  | 서버 기능 정보               |
+| `/health`       | 서버 상태 확인               |
 | `/comix/{path}` | 파일/디렉토리 목록 또는 이미지 스트리밍 |
+
 
 ## 🐳 Docker 이미지
 
 ### 사용 가능한 태그
 
-| 태그 | 설명 | 플랫폼 |
-|------|------|--------|
-| `latest` | 최신 안정 버전 | linux/amd64, linux/arm64 |
-| `v1.0.0` | 특정 버전 (권장) | linux/amd64, linux/arm64 |
-| `v1.0.0-preview` | 다음 버전 미리보기 | linux/amd64, linux/arm64 |
-| `dev` | 개발 버전 | linux/amd64, linux/arm64 |
+
+| 태그               | 설명         | 플랫폼                      |
+| ---------------- | ---------- | ------------------------ |
+| `1.0.2`          | 특정 버전 (권장)                   | linux/amd64, linux/arm64 |
+| `1.0`, `1`       | 해당 메이저/마이너의 최신              | linux/amd64, linux/arm64 |
+| `latest`         | main 최신 빌드 (안정 버전 아님)        | linux/amd64, linux/arm64 |
+| `v1.0.3-preview` | 다음 버전 미리보기                   | linux/amd64, linux/arm64 |
+| `dev`            | 개발 버전 (develop 브랜치)          | linux/amd64, linux/arm64 |
+
 
 ### Docker Hub
+
 ```bash
-docker pull [사용자명]/aircomix-server:latest
-docker pull [사용자명]/aircomix-server:dev
+docker pull teinam/aircomix-server:1.0.2
+docker pull teinam/aircomix-server:latest
 ```
 
 ### GitHub Container Registry
+
 ```bash
-docker pull ghcr.io/[사용자명]/aircomix-server:latest
-docker pull ghcr.io/[사용자명]/aircomix-server:dev
+docker pull ghcr.io/teinam/aircomix-server:1.0.2
+docker pull ghcr.io/teinam/aircomix-server:latest
 ```
 
 ### 환경 변수
 
-| 변수명 | 기본값 | 설명 |
-|--------|--------|------|
-| `COMIX_MANGA_DIRECTORY` | `/comix` | 만화 파일 디렉토리 |
-| `COMIX_SERVER_PORT` | `31257` | 서버 포트 |
-| `COMIX_DEBUG_MODE` | `false` | 디버그 모드 |
-| `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 |
-| `COMIX_ENABLE_AUTH` | `false` | 기본 인증 활성화 |
-| `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 (.htaccess 방식, 인증 활성화 시 필수, 최소 6자) |
-| `COMIX_THUMBNAIL_CACHE_DIRECTORY` | `<manga>/.thumbnails` | 썸네일 캐시 경로 (읽기 전용 마운트 시 필수) |
-| `COMIX_MAX_FILE_SIZE` | `104857600` | 스트리밍 최대 파일 크기 (바이트) |
+
+| 변수명                               | 기본값                   | 설명                                         |
+| --------------------------------- | --------------------- | ------------------------------------------ |
+| `COMIX_MANGA_DIRECTORY`           | `/comix`              | 만화 파일 디렉토리                                 |
+| `COMIX_SERVER_PORT`               | `31257`               | 서버 포트                                      |
+| `COMIX_DEBUG_MODE`                | `false`               | 디버그 모드                                     |
+| `COMIX_LOG_LEVEL`                 | `INFO`                | 로그 레벨                                      |
+| `COMIX_ENABLE_AUTH`               | `false`               | 기본 인증 활성화                                  |
+| `COMIX_AUTH_PASSWORD`             | -                     | 인증 패스워드 (.htaccess 방식, 인증 활성화 시 필수, 최소 6자) |
+| `COMIX_THUMBNAIL_CACHE_DIRECTORY` | `<manga>/.thumbnails` | 썸네일 캐시 경로 (읽기 전용 마운트 시 필수)                 |
+| `COMIX_MAX_FILE_SIZE`             | `104857600`           | 스트리밍 최대 파일 크기 (바이트)                        |
+
 
 > 목록형 설정(`COMIX_HIDDEN_FILES`, `COMIX_IMAGE_EXTENSIONS` 등)은 JSON 배열
 > 문자열로 넘겨야 합니다. 예: `COMIX_IMAGE_EXTENSIONS=["jpg", "png"]`
@@ -174,7 +183,7 @@ docker run -d \
   -v /path/to/your/comix:/comix \
   -e COMIX_ENABLE_AUTH=true \
   -e COMIX_AUTH_PASSWORD=secure_password_123 \
-  [사용자명]/aircomix-server:latest
+  teinam/aircomix-server:1.0.2
 ```
 
 **PHP 원본과 완전 호환**: .htaccess 방식으로 패스워드만 확인하며, AirComix 앱에서 투명하게 작동합니다.
@@ -211,3 +220,4 @@ comix-server-python/
 
 - 🐛 버그 리포트: [GitHub Issues](https://github.com/TeiNam/AirComix-Server-Python/issues)
 - 💡 기능 요청: [GitHub Discussions](https://github.com/TeiNam/AirComix-Server-Python/discussions)
+
