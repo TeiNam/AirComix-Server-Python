@@ -54,7 +54,6 @@ jobs:
         
         ### Docker Compose 사용
         ```yaml
-        version: '3.8'
         services:
           aircomix-server:
             image: ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest

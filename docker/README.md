@@ -9,7 +9,6 @@ AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버입니다. CB
 ```bash
 # docker-compose.yml 생성
 cat > docker-compose.yml << EOF
-version: '3.8'
 services:
   aircomix:
     image: aircomix/aircomix-server:latest
@@ -113,7 +112,6 @@ docker run -d \
 ### 리소스 제한이 있는 Docker Compose
 
 ```yaml
-version: '3.8'
 services:
   aircomix:
     image: aircomix/aircomix-server:latest

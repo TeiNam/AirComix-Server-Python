@@ -96,3 +96,5 @@ coverage/
 # 임시 파일
 *.tmp
 *.temp
+# 로컬 인터프리터 선택(pyenv/uv)은 개발자마다 다르므로 추적하지 않는다
+.python-version

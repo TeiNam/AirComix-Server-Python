@@ -263,7 +263,6 @@ GUNICORN_WORKER_CONNECTIONS=1000
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
 
 services:
   comix-server:

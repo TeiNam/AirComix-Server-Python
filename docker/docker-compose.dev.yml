@@ -1,8 +1,6 @@
 # Development Docker Compose Configuration
 # 개발 환경용 - 핫 리로드 및 디버깅 지원
 
-version: '3.8'
-
 services:
   comix-server-dev:
     build:
