@@ -2,25 +2,31 @@
 
 ## 로컬 개발 환경 설정
 
-### 1. 가상환경 생성 및 활성화
+### 1. uv 설치
+
+의존성은 `uv.lock` 으로 고정되어 있다. 재현 가능한 환경을 위해 [uv](https://docs.astral.sh/uv/) 를 사용한다.
 
 ```bash
-# 가상환경 생성
-python3 -m venv .venv
-
-# 가상환경 활성화
 # macOS/Linux:
-source .venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Windows:
-.venv\Scripts\activate
+# Homebrew:
+brew install uv
 ```
 
 ### 2. 의존성 설치
 
 ```bash
-# 개발 의존성 포함 설치
-pip install -e ".[dev]"
+# 락파일 기준으로 가상환경(.venv) 생성 및 개발 의존성 설치
+uv sync --locked --extra dev
+```
+
+명령 실행은 `uv run` 을 앞에 붙이면 되고, 별도의 가상환경 활성화가 필요 없다.
+`uv run` 은 환경을 자동으로 재동기화하므로 개발 의존성이 필요한 명령에는
+`--extra dev` 를 함께 넘긴다.
+
+```bash
+uv run --extra dev pytest -q
 ```
 
 ### 3. 환경 변수 설정
@@ -117,10 +123,10 @@ make test-auth
 ### 가상환경 관련
 
 **문제**: `ModuleNotFoundError: No module named 'app'`
-**해결**: 가상환경이 활성화되어 있는지 확인하고 `pip install -e ".[dev]"` 실행
+**해결**: `uv sync --locked --extra dev` 로 환경을 다시 동기화한 뒤 `uv run` 으로 실행
 
 **문제**: `pytest: command not found`
-**해결**: 가상환경 활성화 후 개발 의존성 설치
+**해결**: `uv sync --locked --extra dev` 실행 후 `uv run --extra dev pytest` 사용
 
 ### 테스트 관련
 
@@ -143,8 +149,8 @@ make test-auth
 ### 1. 새 기능 개발
 
 ```bash
-# 1. 가상환경 활성화
-source .venv/bin/activate
+# 1. 의존성 동기화
+uv sync --locked --extra dev
 
 # 2. 브랜치 생성
 git checkout -b feature/new-feature

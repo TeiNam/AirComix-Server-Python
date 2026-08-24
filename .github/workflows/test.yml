@@ -34,16 +34,14 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: |
-          uv venv --python ${{ matrix.python-version }}
-          uv pip install -r requirements-dev.txt
+        run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
 
       - name: Prepare manga directory
         run: mkdir -p "${COMIX_MANGA_DIRECTORY}"
 
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run --locked --extra dev pytest -q
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.12'
-        run: uv run pytest --cov=app --cov-report=term-missing -q
+        run: uv run --locked --extra dev pytest --cov=app --cov-report=term-missing -q

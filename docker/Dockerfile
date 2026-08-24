@@ -2,13 +2,19 @@
 # Multi-stage build for optimized production deployment
 
 # Build stage - 의존성 설치 및 빌드
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
+
+# uv 는 버전을 고정해야 빌드가 재현된다
+COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 
 # 빌드 환경 변수 설정
+# UV_PROJECT_ENVIRONMENT: production 스테이지가 통째로 복사할 venv 경로
+# UV_LINK_MODE=copy: 스테이지 간 복사를 위해 하드링크 대신 실제 복사
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=100
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # 시스템 의존성 설치 (빌드용)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,27 +24,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# 가상환경 생성 및 활성화
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+WORKDIR /app
 
-# 먼저 의존성 파일만 복사하여 레이어 캐싱 최적화
-COPY pyproject.toml ./
+# 의존성만 먼저 설치한다.
+# 소스 코드가 바뀌어도 pyproject.toml/uv.lock 이 그대로면 이 레이어는 재사용된다.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-install-project --no-editable
 
-# 기본 의존성만 먼저 설치 (소스 코드 변경 시 캐시 활용)
-RUN pip install --upgrade pip setuptools wheel
-
-# 소스 코드 복사
+# 소스 코드 복사 후 프로젝트 자체만 설치
 COPY app/ ./app/
 COPY images/ ./images/
 COPY README.md ./
-
-# 패키지 설치 및 캐시 정리
-RUN pip install . && \
-    rm -rf ~/.cache/pip /tmp/pip-* || true
+RUN uv sync --locked --no-editable
 
 # Production stage - 실행 환경
-FROM python:3.11-slim as production
+FROM python:3.11-slim AS production
 
 # 메타데이터 라벨
 LABEL maintainer="Comix Server Team" \
@@ -75,12 +75,6 @@ WORKDIR /app
 COPY --chown=comix:comix app/ ./app/
 COPY --chown=comix:comix images/ ./images/
 COPY --chown=comix:comix README.md ./
-
-# 디버깅: 복사된 파일 구조 확인
-RUN echo "=== App directory structure ===" && \
-    find ./app -type f -name "*.py" | head -20 && \
-    echo "=== Middleware files ===" && \
-    ls -la ./app/middleware/ || echo "No middleware directory"
 
 # 만화 디렉토리 생성 및 권한 설정
 # 만화 디렉토리는 읽기 전용으로 마운트되므로 썸네일 캐시는 별도 경로에 둔다.
