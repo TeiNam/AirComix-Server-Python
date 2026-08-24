@@ -5,12 +5,12 @@
 
 import mimetypes
 from pathlib import Path
-from typing import Optional, AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-import aiofiles
 from fastapi import HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
+from app.exceptions import ComixServerException, FileTooLargeError
 from app.models.config import Settings
 from app.services.archive import ArchiveService
 from app.utils.logging import get_logger
@@ -20,14 +20,14 @@ logger = get_logger(__name__)
 
 class ImageService:
     """이미지 파일 처리 및 스트리밍을 담당하는 서비스 클래스"""
-    
+
     def __init__(self, settings: Settings, archive_service: ArchiveService):
         self.settings = settings
         self.archive_service = archive_service
-        
+
         # MIME 타입 매핑 초기화
         self._init_mime_types()
-    
+
     def _init_mime_types(self) -> None:
         """MIME 타입 매핑을 초기화합니다"""
         # 기본 MIME 타입들을 추가
@@ -38,20 +38,20 @@ class ImageService:
         mimetypes.add_type('image/tiff', '.tif')
         mimetypes.add_type('image/tiff', '.tiff')
         mimetypes.add_type('image/bmp', '.bmp')
-    
+
     def get_mime_type(self, filename: str) -> str:
         """파일 확장자로부터 MIME 타입을 결정합니다
-        
+
         Args:
             filename: 파일명
-            
+
         Returns:
             MIME 타입 문자열 (기본값: 'application/octet-stream')
         """
         mime_type, _ = mimetypes.guess_type(filename)
         if mime_type and mime_type.startswith('image/'):
             return mime_type
-        
+
         # 확장자 기반 fallback
         ext = Path(filename).suffix.lower()
         mime_map = {
@@ -63,169 +63,167 @@ class ImageService:
             '.tiff': 'image/tiff',
             '.bmp': 'image/bmp'
         }
-        
+
         return mime_map.get(ext, 'application/octet-stream')
-    
+
     def is_image_file(self, filename: str) -> bool:
         """파일이 지원되는 이미지 파일인지 확인합니다
-        
+
         Args:
             filename: 파일명
-            
+
         Returns:
             이미지 파일 여부
         """
         ext = Path(filename).suffix.lower().lstrip('.')
         return ext in [ext.lower() for ext in self.settings.image_extensions]
-    
-    async def _file_streamer(self, file_path: Path, chunk_size: int = 8192) -> AsyncGenerator[bytes, None]:
-        """파일을 청크 단위로 스트리밍합니다
-        
+
+    async def _bytes_streamer(
+        self, data: bytes, chunk_size: Optional[int] = None
+    ) -> AsyncGenerator[bytes, None]:
+        """메모리에 있는 데이터를 청크 단위로 스트리밍합니다
+
         Args:
-            file_path: 스트리밍할 파일 경로
-            chunk_size: 청크 크기 (바이트)
-            
+            data: 전송할 데이터
+            chunk_size: 청크 크기 (기본값: 설정의 chunk_size)
+
         Yields:
-            파일 데이터 청크
+            데이터 청크
         """
-        try:
-            async with aiofiles.open(file_path, 'rb') as file:
-                while chunk := await file.read(chunk_size):
-                    yield chunk
-        except Exception as e:
-            logger.error(f"파일 스트리밍 중 오류 발생: {file_path}, 오류: {e}")
-            raise HTTPException(status_code=500, detail="파일 스트리밍 오류")
-    
-    async def stream_image(self, image_path: Path) -> StreamingResponse:
+        size = chunk_size or self.settings.chunk_size
+        for offset in range(0, len(data), size):
+            yield data[offset:offset + size]
+
+    async def stream_image(self, image_path: Path) -> FileResponse:
         """직접 이미지 파일을 스트리밍합니다
-        
+
+        Range 요청 처리(206/416), Content-Length, ETag, Last-Modified 는
+        Starlette FileResponse 가 담당한다.
+
         Args:
             image_path: 이미지 파일 경로
-            
+
         Returns:
-            StreamingResponse 객체
-            
+            FileResponse 객체
+
         Raises:
             HTTPException: 파일이 존재하지 않거나 접근할 수 없는 경우
+            FileTooLargeError: 최대 파일 크기를 초과한 경우
         """
         if not image_path.exists():
             logger.warning(f"이미지 파일을 찾을 수 없음: {image_path}")
             raise HTTPException(status_code=404, detail="이미지 파일을 찾을 수 없습니다")
-        
+
         if not image_path.is_file():
             logger.warning(f"경로가 파일이 아님: {image_path}")
             raise HTTPException(status_code=404, detail="유효한 이미지 파일이 아닙니다")
-        
+
         try:
-            # 파일 크기 확인
-            file_size = image_path.stat().st_size
+            stat_result = image_path.stat()
+            file_size = stat_result.st_size
             mime_type = self.get_mime_type(image_path.name)
-            
+
+            if file_size > self.settings.max_file_size:
+                raise FileTooLargeError(
+                    image_path.name, file_size, self.settings.max_file_size
+                )
+
             logger.info(f"이미지 스트리밍 시작: {image_path.name}, 크기: {file_size}, MIME: {mime_type}")
-            
-            headers = {
-                'Content-Type': mime_type,
-                'Content-Length': str(file_size),
-                'Accept-Ranges': 'bytes'
-            }
-            
-            return StreamingResponse(
-                self._file_streamer(image_path),
+
+            return FileResponse(
+                image_path,
                 media_type=mime_type,
-                headers=headers
+                stat_result=stat_result,
             )
-            
+
+        except (ComixServerException, HTTPException):
+            raise
         except Exception as e:
             logger.error(f"이미지 스트리밍 준비 중 오류: {image_path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="이미지 스트리밍 오류")
-    
-    async def _archive_streamer(self, archive_path: Path, image_path: str, chunk_size: int = 8192) -> AsyncGenerator[bytes, None]:
-        """아카이브에서 이미지를 추출하여 스트리밍합니다
-        
-        Args:
-            archive_path: 아카이브 파일 경로
-            image_path: 아카이브 내 이미지 경로
-            chunk_size: 청크 크기 (바이트)
-            
-        Yields:
-            이미지 데이터 청크
-        """
-        try:
-            # 아카이브에서 파일 데이터를 한 번에 추출
-            image_data = await self.archive_service.extract_file_from_archive(archive_path, image_path)
-            
-            # 데이터를 청크 단위로 yield
-            for i in range(0, len(image_data), chunk_size):
-                yield image_data[i:i + chunk_size]
-                
-        except Exception as e:
-            logger.error(f"아카이브에서 이미지 스트리밍 중 오류: {archive_path}:{image_path}, 오류: {e}")
-            raise HTTPException(status_code=500, detail="아카이브 이미지 스트리밍 오류")
-    
+
     async def stream_image_from_archive(self, archive_path: Path, image_path: str) -> StreamingResponse:
         """아카이브에서 이미지를 스트리밍합니다
-        
+
+        ponytail: 멤버를 메모리에 올린 뒤 통째로 내보낸다. 만화 한 페이지 크기라면
+        충분하고, 상한은 max_file_size 로 막는다. Range 요청은 무시하고 전체를
+        보낸다(RFC 9110 허용). 부분 요청이 정말 필요해지면 그때 구현한다.
+
         Args:
             archive_path: 아카이브 파일 경로
             image_path: 아카이브 내 이미지 경로
-            
+
         Returns:
             StreamingResponse 객체
-            
+
         Raises:
             HTTPException: 아카이브나 이미지를 찾을 수 없는 경우
         """
         if not archive_path.exists():
             logger.warning(f"아카이브 파일을 찾을 수 없음: {archive_path}")
             raise HTTPException(status_code=404, detail="아카이브 파일을 찾을 수 없습니다")
-        
+
         try:
             # 아카이브 내 파일 목록 확인
             archive_contents = await self.archive_service.list_archive_contents(archive_path)
-            
+
             if image_path not in archive_contents:
                 logger.warning(f"아카이브 내 이미지를 찾을 수 없음: {archive_path}:{image_path}")
                 raise HTTPException(status_code=404, detail="아카이브 내 이미지를 찾을 수 없습니다")
-            
+
             # 이미지 파일인지 확인
             if not self.is_image_file(image_path):
                 logger.warning(f"지원되지 않는 이미지 형식: {image_path}")
                 raise HTTPException(status_code=400, detail="지원되지 않는 이미지 형식입니다")
-            
+
+            # 응답을 시작하기 전에 추출을 끝낸다.
+            # 스트리밍 도중 실패하면 상태코드를 바꿀 수 없어 연결만 끊긴다.
+            image_data = await self.archive_service.extract_file_from_archive(
+                archive_path, image_path
+            )
+
+            if not image_data:
+                logger.warning(f"아카이브에서 이미지 추출 실패: {archive_path}:{image_path}")
+                raise HTTPException(status_code=404, detail="아카이브 내 이미지를 읽을 수 없습니다")
+
             mime_type = self.get_mime_type(image_path)
-            
-            logger.info(f"아카이브에서 이미지 스트리밍 시작: {archive_path.name}:{image_path}, MIME: {mime_type}")
-            
+
+            logger.info(
+                f"아카이브에서 이미지 스트리밍 시작: {archive_path.name}:{image_path}, "
+                f"크기: {len(image_data)}, MIME: {mime_type}"
+            )
+
             headers = {
                 'Content-Type': mime_type,
+                'Content-Length': str(len(image_data)),
                 'Accept-Ranges': 'bytes'
             }
-            
+
             return StreamingResponse(
-                self._archive_streamer(archive_path, image_path),
+                self._bytes_streamer(image_data),
                 media_type=mime_type,
                 headers=headers
             )
-            
-        except HTTPException:
-            # HTTPException은 그대로 재발생
+
+        except (ComixServerException, HTTPException):
+            # 404/400/413 등 의미가 있는 상태코드는 그대로 전달
             raise
         except Exception as e:
             logger.error(f"아카이브 이미지 스트리밍 준비 중 오류: {archive_path}:{image_path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="아카이브 이미지 스트리밍 오류")
-    
+
     async def get_image_info(self, image_path: Path) -> Optional[dict]:
         """이미지 파일의 기본 정보를 반환합니다
-        
+
         Args:
             image_path: 이미지 파일 경로
-            
+
         Returns:
             이미지 정보 딕셔너리 또는 None
         """
         if not image_path.exists() or not image_path.is_file():
             return None
-        
+
         try:
             stat = image_path.stat()
             return {

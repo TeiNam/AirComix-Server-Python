@@ -24,13 +24,14 @@ class ComixServerException(Exception):
 
 class FileNotFoundError(ComixServerException):
     """파일 또는 디렉토리를 찾을 수 없는 경우"""
-    
+
     def __init__(self, path: str, detail: Optional[str] = None):
+        # message 는 로그용(경로 포함), detail 은 응답용(서버 경로 비노출)
         message = f"파일 또는 디렉토리를 찾을 수 없습니다: {path}"
         super().__init__(
             message=message,
             status_code=404,
-            detail=detail or message
+            detail=detail or "파일 또는 디렉토리를 찾을 수 없습니다"
         )
 
 
@@ -79,6 +80,18 @@ class CorruptedArchiveError(ComixServerException):
             message=message,
             status_code=400,
             detail=detail or "손상된 아카이브 파일입니다"
+        )
+
+
+class FileTooLargeError(ComixServerException):
+    """설정된 최대 파일 크기를 초과한 경우"""
+
+    def __init__(self, path: str, size: int, limit: int, detail: Optional[str] = None):
+        message = f"파일이 너무 큽니다: {path} ({size} bytes > {limit} bytes)"
+        super().__init__(
+            message=message,
+            status_code=413,
+            detail=detail or "파일이 너무 커서 전송할 수 없습니다"
         )
 
 

@@ -9,6 +9,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Tuple, Optional
 
+from app.models.config import settings
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -111,39 +112,34 @@ class PathUtils:
     def extract_archive_and_image_paths(full_path: str) -> Tuple[str, str]:
         """
         전체 경로에서 아카이브 경로와 내부 이미지 경로를 분리
-        
-        예: "manga/series/volume1.zip/page001.jpg" 
+
+        예: "manga/series/volume1.zip/page001.jpg"
         -> ("manga/series/volume1.zip", "page001.jpg")
-        
+
+        경로 세그먼트 단위로 가장 앞쪽 아카이브 경계를 찾는다.
+        확장자 문자열을 그대로 검색하면 "book.rar/page.zip.jpg" 처럼
+        내부 파일명에 아카이브 확장자가 섞인 경로를 잘못 분리한다.
+
         Args:
             full_path: 전체 경로
-            
+
         Returns:
             Tuple[str, str]: (아카이브 경로, 내부 이미지 경로)
         """
-        # 지원하는 아카이브 확장자들
-        archive_extensions = ['.zip', '.cbz', '.rar', '.cbr']
-        
-        full_path = PathUtils.normalize_path(full_path)
-        
-        for ext in archive_extensions:
-            # 대소문자 구분 없이 검색
-            lower_path = full_path.lower()
-            ext_pos = lower_path.find(ext.lower())
-            
-            if ext_pos != -1:
-                # 아카이브 파일 경로 추출 (실제 대소문자 유지)
-                archive_end = ext_pos + len(ext)
-                archive_path = full_path[:archive_end]
-                
-                # 내부 이미지 경로 추출
-                remaining_path = full_path[archive_end:]
-                image_path = remaining_path.lstrip('/')
-                
+        normalized = PathUtils.normalize_path(full_path)
+        if not normalized:
+            return "", ""
+
+        parts = normalized.split('/')
+
+        for index, part in enumerate(parts):
+            if PathUtils.get_file_extension(part) in settings.archive_extensions:
+                archive_path = '/'.join(parts[:index + 1])
+                image_path = '/'.join(parts[index + 1:])
                 return archive_path, image_path
-        
+
         # 아카이브가 아닌 경우 전체 경로를 파일 경로로 반환
-        return full_path, ""
+        return normalized, ""
     
     @staticmethod
     def get_file_extension(filename: str) -> str:
@@ -173,17 +169,8 @@ class PathUtils:
         Returns:
             bool: 아카이브 내부 파일 경로인지 여부
         """
-        archive_extensions = ['.zip', '.cbz', '.rar', '.cbr']
-        lower_path = path.lower()
-        
-        for ext in archive_extensions:
-            if ext in lower_path:
-                # 확장자 뒤에 추가 경로가 있는지 확인
-                ext_pos = lower_path.find(ext)
-                remaining = path[ext_pos + len(ext):]
-                return bool(remaining.strip('/'))
-        
-        return False
+        _, image_path = PathUtils.extract_archive_and_image_paths(path)
+        return bool(image_path)
     
     @staticmethod
     def join_path(*parts: str) -> str:

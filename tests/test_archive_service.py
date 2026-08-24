@@ -221,3 +221,47 @@ def test_archive_service_without_rarfile():
     # RAR 파일 형식은 여전히 인식해야 함
     assert service.is_archive_file("test.rar") is True
     assert service.is_archive_file("test.cbr") is True
+
+@pytest.mark.asyncio
+async def test_extract_matches_exact_entry_name():
+    """중첩 엔트리가 최상위 엔트리 요청을 가로채지 않는다
+
+    끝부분 매칭을 쓰면 "page.jpg" 요청에 "dir/page.jpg" 가 응답해서
+    다른 페이지가 표시된다.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        zip_path = Path(temp_dir) / "nested.zip"
+
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            # 중첩 엔트리를 먼저 기록해서 순회 순서상 앞에 오게 한다
+            zip_file.writestr("dir/page.jpg", b"nested-entry")
+            zip_file.writestr("page.jpg", b"top-level-entry")
+
+        service = ArchiveService()
+
+        assert await service.extract_file_from_archive(zip_path, "page.jpg") == b"top-level-entry"
+        assert await service.extract_file_from_archive(zip_path, "dir/page.jpg") == b"nested-entry"
+        # 일치하는 엔트리가 없으면 None
+        assert await service.extract_file_from_archive(zip_path, "missing.jpg") is None
+
+
+@pytest.mark.asyncio
+async def test_extract_rejects_oversized_member(monkeypatch):
+    """최대 파일 크기를 초과하는 멤버는 읽지 않고 413 을 발생시킨다"""
+    from app.services import archive as archive_module
+    from app.exceptions import FileTooLargeError
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        zip_path = Path(temp_dir) / "big.zip"
+
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            zip_file.writestr("page.jpg", b"x" * 5000)
+
+        monkeypatch.setattr(archive_module.settings, "max_file_size", 100)
+
+        service = ArchiveService()
+
+        with pytest.raises(FileTooLargeError) as exc_info:
+            await service.extract_file_from_archive(zip_path, "page.jpg")
+
+        assert exc_info.value.status_code == 413

@@ -131,6 +131,38 @@ class EncodingUtils:
         return EncodingUtils.detect_and_convert_encoding(filename)
     
     @staticmethod
+    def decode_zip_entry_name(entry_name: str, is_utf8_flagged: bool) -> str:
+        """
+        ZIP 엔트리 파일명을 올바른 인코딩으로 복원
+
+        ZIP 스펙은 UTF-8 플래그가 없는 파일명을 CP437로 규정하고 zipfile도 그렇게
+        디코딩한다. 한국어 압축 파일은 실제로 CP949/EUC-KR로 기록되어 있어서
+        그대로 쓰면 파일명이 깨진다. CP437 바이트로 되돌린 뒤 설정된 인코딩으로
+        다시 디코딩한다.
+
+        Args:
+            entry_name: zipfile이 디코딩한 파일명
+            is_utf8_flagged: ZIP 엔트리에 UTF-8 플래그(0x800)가 설정되어 있는지
+
+        Returns:
+            str: 복원된 파일명
+        """
+        if not entry_name or is_utf8_flagged:
+            return entry_name
+
+        # ASCII 이름은 어떤 인코딩에서도 동일하므로 변환하지 않는다
+        if entry_name.isascii():
+            return entry_name
+
+        try:
+            raw = entry_name.encode('cp437')
+        except UnicodeEncodeError:
+            # CP437로 표현할 수 없다면 이미 올바르게 디코딩된 이름이다
+            return entry_name
+
+        return EncodingUtils.safe_decode(raw, settings.fallback_encodings)
+
+    @staticmethod
     def is_encoding_convertible(text: bytes, source_encoding: str) -> bool:
         """
         특정 인코딩으로 변환 가능한지 확인 (PHP 버전 호환성)
