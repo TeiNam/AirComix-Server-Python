@@ -15,6 +15,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      owner_lc: ${{ steps.version.outputs.owner_lc }}
 
     steps:
     - name: Checkout repository
@@ -44,6 +47,8 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "major_minor=$(echo $VERSION | cut -d. -f1-2)" >> $GITHUB_OUTPUT
         echo "major=$(echo $VERSION | cut -d. -f1)" >> $GITHUB_OUTPUT
+        # ghcr 은 저장소 이름이 소문자여야 한다. github.repository_owner 는 원래 대소문자를 유지한다.
+        echo "owner_lc=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
     - name: Build and push to Docker Hub
       uses: docker/build-push-action@v7
@@ -73,10 +78,10 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: true
         tags: |
-          ghcr.io/${{ github.repository_owner }}/aircomix-server:latest
-          ghcr.io/${{ github.repository_owner }}/aircomix-server:${{ steps.version.outputs.version }}
-          ghcr.io/${{ github.repository_owner }}/aircomix-server:${{ steps.version.outputs.major_minor }}
-          ghcr.io/${{ github.repository_owner }}/aircomix-server:${{ steps.version.outputs.major }}
+          ghcr.io/${{ steps.version.outputs.owner_lc }}/aircomix-server:latest
+          ghcr.io/${{ steps.version.outputs.owner_lc }}/aircomix-server:${{ steps.version.outputs.version }}
+          ghcr.io/${{ steps.version.outputs.owner_lc }}/aircomix-server:${{ steps.version.outputs.major_minor }}
+          ghcr.io/${{ steps.version.outputs.owner_lc }}/aircomix-server:${{ steps.version.outputs.major }}
         labels: |
           org.opencontainers.image.title=Comix Server
           org.opencontainers.image.description=Comic book streaming server compatible with AirComix iOS app
@@ -100,14 +105,14 @@ jobs:
         echo "" >> release_notes.md
         echo "### Docker Hub" >> release_notes.md
         echo '```bash' >> release_notes.md
-        echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:${{ steps.version.outputs.version }}" >> release_notes.md
+        echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:${{ needs.docker-release.outputs.version }}" >> release_notes.md
         echo "docker pull ${{ secrets.DOCKERHUB_USERNAME }}/aircomix-server:latest" >> release_notes.md
         echo '```' >> release_notes.md
         echo "" >> release_notes.md
         echo "### GitHub Container Registry" >> release_notes.md
         echo '```bash' >> release_notes.md
-        echo "docker pull ghcr.io/${{ github.repository_owner }}/aircomix-server:${{ steps.version.outputs.version }}" >> release_notes.md
-        echo "docker pull ghcr.io/${{ github.repository_owner }}/aircomix-server:latest" >> release_notes.md
+        echo "docker pull ghcr.io/${{ needs.docker-release.outputs.owner_lc }}/aircomix-server:${{ needs.docker-release.outputs.version }}" >> release_notes.md
+        echo "docker pull ghcr.io/${{ needs.docker-release.outputs.owner_lc }}/aircomix-server:latest" >> release_notes.md
         echo '```' >> release_notes.md
         echo "" >> release_notes.md
         echo "## Quick Start" >> release_notes.md

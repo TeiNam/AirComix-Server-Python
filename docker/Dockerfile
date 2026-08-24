@@ -42,7 +42,6 @@ FROM python:3.11-slim AS production
 
 # 메타데이터 라벨
 LABEL maintainer="Comix Server Team" \
-      version="1.0.2" \
       description="Comic book streaming server compatible with AirComix iOS app" \
       org.opencontainers.image.source="https://github.com/comix-server/comix-server-python"
 
