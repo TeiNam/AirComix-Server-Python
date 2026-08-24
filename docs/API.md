@@ -6,7 +6,16 @@ Comix Server는 AirComix iOS 앱과 호환되는 RESTful API를 제공합니다.
 
 - **Base URL**: `http://localhost:31257`
 - **Content-Type**: `text/plain` (목록), `image/*` (이미지)
-- **인증**: 없음 (로컬 네트워크 사용 가정)
+- **인증**: 기본값은 없음(로컬 네트워크 사용 가정). `COMIX_ENABLE_AUTH=true` 로
+  HTTP Basic 인증(.htaccess 방식, 패스워드만 확인)을 켤 수 있습니다.
+
+### 인증을 켠 경우
+
+- 인증 없이 접근 가능한 경로: `/`, `/welcome.102`, `/health`
+  (AirComix 앱의 최초 연결과 컨테이너 헬스체크에 필요)
+- 그 외 모든 경로(`/comix/...` 루트 목록 포함)는 인증이 필요하며,
+  자격증명이 없으면 `401` + `WWW-Authenticate: Basic realm="AirComix"` 를 반환합니다.
+- 패스워드를 연속 5회 틀리면 해당 IP를 60초간 차단하고 `429` + `Retry-After` 를 반환합니다.
 
 ## 엔드포인트
 
@@ -77,10 +86,10 @@ Status: 200 OK
 Content-Type: text/plain
 
 status=healthy
-manga_directory=/var/lib/comix/manga
-debug_mode=false
 service=comix-server
 ```
+
+> 인증 없이 접근할 수 있는 엔드포인트이므로 서버 경로나 설정 값은 노출하지 않습니다.
 
 #### 오류 응답
 
@@ -104,7 +113,7 @@ curl http://localhost:31257/health
 만화 디렉토리 내의 모든 콘텐츠를 처리하는 통합 엔드포인트입니다.
 
 ```http
-GET /manga/{path}
+GET /comix/{path}
 ```
 
 #### 매개변수
@@ -129,8 +138,8 @@ GET /manga/{path}
 ##### 요청
 
 ```http
-GET /manga/
-GET /manga/Series%20A/
+GET /comix/
+GET /comix/Series%20A/
 ```
 
 ##### 응답
@@ -157,13 +166,13 @@ collection.zip
 
 ```bash
 # 루트 디렉토리 목록
-curl http://localhost:31257/manga/
+curl http://localhost:31257/comix/
 
 # 특정 시리즈 디렉토리
-curl "http://localhost:31257/manga/Series%20A/"
+curl "http://localhost:31257/comix/Series%20A/"
 
 # 중첩 디렉토리
-curl "http://localhost:31257/manga/Series%20A/Volume%201/"
+curl "http://localhost:31257/comix/Series%20A/Volume%201/"
 ```
 
 ---
@@ -180,8 +189,8 @@ curl "http://localhost:31257/manga/Series%20A/Volume%201/"
 ##### 요청
 
 ```http
-GET /manga/series1.zip
-GET /manga/Series%20A/Volume%201.cbz
+GET /comix/series1.zip
+GET /comix/Series%20A/Volume%201.cbz
 ```
 
 ##### 응답
@@ -204,13 +213,13 @@ cover.jpg
 
 ```bash
 # ZIP 파일 내용
-curl http://localhost:31257/manga/series1.zip
+curl http://localhost:31257/comix/series1.zip
 
 # CBZ 파일 내용
-curl "http://localhost:31257/manga/Series%20A/Volume%201.cbz"
+curl "http://localhost:31257/comix/Series%20A/Volume%201.cbz"
 
 # 경로에 공백이 있는 경우
-curl "http://localhost:31257/manga/My%20Series/Vol%2001.zip"
+curl "http://localhost:31257/comix/My%20Series/Vol%2001.zip"
 ```
 
 ---
@@ -230,8 +239,8 @@ curl "http://localhost:31257/manga/My%20Series/Vol%2001.zip"
 ##### 요청
 
 ```http
-GET /manga/cover.jpg
-GET /manga/Series%20A/artwork.png
+GET /comix/cover.jpg
+GET /comix/Series%20A/artwork.png
 ```
 
 ##### 응답
@@ -254,13 +263,13 @@ Content-Length: 245760
 
 ```bash
 # 이미지 다운로드
-curl http://localhost:31257/manga/cover.jpg -o cover.jpg
+curl http://localhost:31257/comix/cover.jpg -o cover.jpg
 
 # 이미지 정보만 확인
-curl -I http://localhost:31257/manga/cover.jpg
+curl -I http://localhost:31257/comix/cover.jpg
 
 # 스트리밍으로 표시
-curl http://localhost:31257/manga/cover.jpg | display
+curl http://localhost:31257/comix/cover.jpg | display
 ```
 
 ---
@@ -272,8 +281,8 @@ curl http://localhost:31257/manga/cover.jpg | display
 ##### 요청
 
 ```http
-GET /manga/series1.zip/page001.jpg
-GET /manga/Series%20A/Volume%201.cbz/cover.png
+GET /comix/series1.zip/page001.jpg
+GET /comix/Series%20A/Volume%201.cbz/cover.png
 ```
 
 ##### 응답
@@ -288,7 +297,7 @@ Content-Length: 156432
 
 ##### 경로 형식
 
-`/manga/{archive_path}/{image_path}`
+`/comix/{archive_path}/{image_path}`
 
 - `archive_path`: 아카이브 파일 경로
 - `image_path`: 아카이브 내 이미지 파일 경로
@@ -297,13 +306,46 @@ Content-Length: 156432
 
 ```bash
 # ZIP 파일에서 이미지 추출
-curl "http://localhost:31257/manga/series1.zip/page001.jpg" -o page001.jpg
+curl "http://localhost:31257/comix/series1.zip/page001.jpg" -o page001.jpg
 
 # CBZ 파일에서 커버 이미지
-curl "http://localhost:31257/manga/Series%20A/Volume%201.cbz/cover.jpg" -o cover.jpg
+curl "http://localhost:31257/comix/Series%20A/Volume%201.cbz/cover.jpg" -o cover.jpg
 
 # RAR 파일에서 이미지 (unrar 필요)
-curl "http://localhost:31257/manga/series1.rar/page001.jpg" -o page001.jpg
+curl "http://localhost:31257/comix/series1.rar/page001.jpg" -o page001.jpg
+```
+
+---
+
+### 5. 썸네일
+
+아카이브 파일이나 폴더의 썸네일(JPEG, 최대 200×300)을 반환합니다.
+아카이브는 첫 번째 이미지, 폴더는 첫 번째 아카이브의 첫 페이지를 사용하며,
+manga 루트 폴더는 `images/aircomix.jpg` 를 사용합니다.
+
+```http
+GET /thumbnail/{path}
+GET /{name}.thm
+GET /comix/{path}.thm
+```
+
+- `/{name}.thm` 는 AirComix 앱 호환용으로 **최상위 항목**만 처리합니다.
+  하위 경로 썸네일은 `/comix/{path}.thm` 또는 `/thumbnail/{path}` 를 사용하세요.
+- 썸네일은 캐시되며 원본이 더 최신이면 자동으로 재생성됩니다.
+  캐시 경로는 `COMIX_THUMBNAIL_CACHE_DIRECTORY` 로 지정합니다.
+- 인증이 켜져 있으면 `Cache-Control: private` 로 응답합니다.
+
+---
+
+### 6. 썸네일 캐시 관리 (관리용)
+
+`COMIX_ENABLE_AUTH=true` 인 경우에만 등록되는 엔드포인트입니다.
+인증이 비활성화된 서버에서는 `404` 를 반환합니다.
+
+```http
+GET    /admin/thumbnail/info     # 캐시 상태 (JSON)
+POST   /admin/thumbnail/cleanup  # 원본이 사라진 썸네일 정리
+DELETE /admin/thumbnail/cache    # 캐시 전체 삭제
 ```
 
 ---
@@ -315,11 +357,16 @@ curl "http://localhost:31257/manga/series1.rar/page001.jpg" -o page001.jpg
 | 코드 | 설명 | 예시 |
 |------|------|------|
 | 200 | 성공 | 정상적인 응답 |
+| 206 | 부분 응답 | 직접 이미지에 대한 `Range` 요청 |
 | 400 | 잘못된 요청 | 지원되지 않는 파일 형식 |
+| 401 | 인증 필요 | 인증 활성화 상태에서 자격증명 누락/불일치 |
 | 403 | 접근 거부 | 경로 순회 공격 시도 |
-| 404 | 찾을 수 없음 | 존재하지 않는 파일/디렉토리 |
+| 404 | 찾을 수 없음 | 존재하지 않는 파일/디렉토리, 아카이브 내 이미지 없음 |
+| 413 | 크기 초과 | `COMIX_MAX_FILE_SIZE` 를 넘는 파일 |
+| 416 | 범위 오류 | 잘못된 `Range` 요청 |
+| 429 | 요청 제한 | 인증 연속 실패로 일시 차단 |
 | 500 | 서버 오류 | 내부 서버 오류 |
-| 503 | 서비스 불가 | 서버 상태 불량 |
+| 503 | 서비스 불가 | 서버 상태 불량 (manga 디렉토리 접근 불가 등) |
 
 ### 오류 응답 형식
 
@@ -342,7 +389,7 @@ Content-Type: application/json
   "error": "파일 또는 디렉토리를 찾을 수 없습니다",
   "detail": "/path/to/missing/file",
   "status_code": 404,
-  "path": "/manga/missing.jpg",
+  "path": "/comix/missing.jpg",
   "method": "GET"
 }
 ```
@@ -422,7 +469,7 @@ class ComixClient:
     
     def get_directory_list(self, path=""):
         """디렉토리 목록 조회"""
-        url = f"{self.base_url}/manga/{path}"
+        url = f"{self.base_url}/comix/{path}"
         response = requests.get(url)
         if response.status_code == 200:
             return response.text.strip().split('\n')
@@ -430,7 +477,7 @@ class ComixClient:
     
     def download_image(self, path, output_file):
         """이미지 다운로드"""
-        url = f"{self.base_url}/manga/{path}"
+        url = f"{self.base_url}/comix/{path}"
         response = requests.get(url, stream=True)
         if response.status_code == 200:
             with open(output_file, 'wb') as f:
@@ -454,7 +501,7 @@ class ComixClient {
     }
     
     async getDirectoryList(path = '') {
-        const response = await fetch(`${this.baseUrl}/manga/${path}`);
+        const response = await fetch(`${this.baseUrl}/comix/${path}`);
         if (response.ok) {
             const text = await response.text();
             return text.trim().split('\n');
@@ -463,7 +510,7 @@ class ComixClient {
     }
     
     getImageUrl(path) {
-        return `${this.baseUrl}/manga/${path}`;
+        return `${this.baseUrl}/comix/${path}`;
     }
     
     async checkHealth() {
@@ -493,22 +540,22 @@ echo -e "\n"
 
 # 루트 디렉토리 목록
 echo "=== 루트 디렉토리 ==="
-curl -s "$BASE_URL/manga/"
+curl -s "$BASE_URL/comix/"
 echo -e "\n"
 
 # 특정 시리즈 목록
 echo "=== 시리즈 목록 ==="
-curl -s "$BASE_URL/manga/Series%20A/"
+curl -s "$BASE_URL/comix/Series%20A/"
 echo -e "\n"
 
 # 아카이브 내용
 echo "=== 아카이브 내용 ==="
-curl -s "$BASE_URL/manga/Series%20A/Volume%201.zip"
+curl -s "$BASE_URL/comix/Series%20A/Volume%201.zip"
 echo -e "\n"
 
 # 이미지 다운로드
 echo "=== 이미지 다운로드 ==="
-curl -s "$BASE_URL/manga/Series%20A/Volume%201.zip/page001.jpg" -o "page001.jpg"
+curl -s "$BASE_URL/comix/Series%20A/Volume%201.zip/page001.jpg" -o "page001.jpg"
 echo "이미지 저장 완료: page001.jpg"
 ```
 
