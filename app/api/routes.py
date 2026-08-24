@@ -263,11 +263,15 @@ async def get_thumbnail_by_thm_extension(path: str):
 
         manga_root = Path(settings.manga_directory)
 
-        # 빈 경로이거나 manga 루트 이름인 경우 루트 폴더 썸네일
-        if not decoded_path or decoded_path == manga_root.name:
+        if not decoded_path:
             target_path = manga_root
         else:
             target_path = PathUtils.resolve_safe_path(manga_root, decoded_path)
+
+            # 실제 항목이 없고 루트 별칭으로 보이면 루트 폴더 썸네일로 처리한다.
+            # 앱이 루트 이름을 그대로 쓰거나 "manga" 를 쓰는 경우를 모두 받아준다.
+            if not target_path.exists() and decoded_path in {"manga", manga_root.name}:
+                target_path = manga_root
 
         return await _thumbnail_response(target_path)
 
