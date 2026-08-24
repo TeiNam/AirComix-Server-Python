@@ -83,8 +83,12 @@ RUN echo "=== App directory structure ===" && \
     ls -la ./app/middleware/ || echo "No middleware directory"
 
 # 만화 디렉토리 생성 및 권한 설정
-RUN mkdir -p /comix && \
-    chown comix:comix /comix
+# 만화 디렉토리는 읽기 전용으로 마운트되므로 썸네일 캐시는 별도 경로에 둔다.
+RUN mkdir -p /comix /app/cache && \
+    chown comix:comix /comix /app/cache
+
+# 썸네일 캐시 경로 기본값 (읽기 전용 manga 마운트에서도 캐시가 동작하도록)
+ENV COMIX_THUMBNAIL_CACHE_DIRECTORY=/app/cache
 
 # 비루트 사용자로 전환
 USER comix

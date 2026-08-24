@@ -13,12 +13,12 @@ from app.utils.path import PathUtils
 def test_normalize_path():
     """경로 정규화 테스트"""
     # 기본 정규화
-    assert PathUtils.normalize_path("/comix/series/volume1") == "manga/series/volume1"
+    assert PathUtils.normalize_path("/comix/series/volume1") == "comix/series/volume1"
     assert PathUtils.normalize_path("manga//series///volume1") == "manga/series/volume1"
     assert PathUtils.normalize_path("manga\\series\\volume1") == "manga/series/volume1"
     
     # 공백 처리
-    assert PathUtils.normalize_path("  /comix/series/  ") == "manga/series"
+    assert PathUtils.normalize_path("  /comix/series/  ") == "comix/series"
     assert PathUtils.normalize_path("") == ""
     
     # 특수 경우
@@ -111,7 +111,7 @@ def test_is_archive_path():
 def test_join_path():
     """경로 결합 테스트"""
     assert PathUtils.join_path("manga", "series", "volume1") == "manga/series/volume1"
-    assert PathUtils.join_path("/comix/", "/series/", "/volume1/") == "manga/series/volume1"
+    assert PathUtils.join_path("/comix/", "/series/", "/volume1/") == "comix/series/volume1"
     assert PathUtils.join_path("manga", "", "volume1") == "manga/volume1"
     assert PathUtils.join_path("", "", "") == ""
     assert PathUtils.join_path("manga") == "manga"

@@ -25,6 +25,8 @@ services:
       - "${CONFIG_DIRECTORY:-./config}:/app/config:ro"
       # 선택사항: 로그 디렉토리 마운트
       - "${LOG_DIRECTORY:-./logs}:/app/logs:rw"
+      # 썸네일 캐시 (manga 디렉토리가 읽기 전용이라 별도 볼륨이 필요하다)
+      - "aircomix-cache:/app/cache"
     
     # 환경 변수
     environment:
@@ -47,6 +49,9 @@ services:
       # 성능 설정 (바이트 단위, 최대 1GB)
       - COMIX_MAX_FILE_SIZE=${MAX_FILE_SIZE:-104857600}
       - COMIX_CHUNK_SIZE=${CHUNK_SIZE:-8192}
+
+      # 썸네일 캐시 경로 (위 aircomix-cache 볼륨)
+      - COMIX_THUMBNAIL_CACHE_DIRECTORY=/app/cache
 
       # 인증 설정
       - COMIX_ENABLE_AUTH=${COMIX_ENABLE_AUTH:-false}

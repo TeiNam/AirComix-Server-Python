@@ -5,7 +5,12 @@ on:
     types: [published]
 
 jobs:
+  # 테스트가 통과하지 않으면 릴리스 이미지를 빌드/푸시하지 않는다
+  test:
+    uses: ./.github/workflows/test.yml
+
   docker-release:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read

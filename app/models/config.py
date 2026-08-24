@@ -4,11 +4,14 @@
 Pydantic Settings를 사용한 환경 변수 기반 설정 관리
 """
 
+import logging
+import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import field_validator, Field, ConfigDict
-from pydantic_settings import BaseSettings
+from pydantic import field_validator, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -47,6 +50,13 @@ class Settings(BaseSettings):
         default=8192,
         description="파일 스트리밍 시 청크 크기 (바이트)"
     )
+    thumbnail_cache_directory: Optional[Path] = Field(
+        default=None,
+        description=(
+            "썸네일 캐시 디렉토리 (기본값: manga_directory/.thumbnails). "
+            "manga 디렉토리를 읽기 전용으로 마운트하는 경우 쓰기 가능한 경로를 지정한다."
+        )
+    )
     
     # 파일 필터링 설정
     hidden_files: List[str] = Field(
@@ -73,10 +83,6 @@ class Settings(BaseSettings):
         default="EUC-KR",
         description="아카이브 내 파일명의 원본 인코딩"
     )
-    target_encoding: str = Field(
-        default="UTF-8",
-        description="변환할 대상 인코딩"
-    )
     fallback_encodings: List[str] = Field(
         default=["CP949", "EUC-KR", "UTF-8", "latin1"],
         description="인코딩 변환 실패 시 시도할 인코딩 목록"
@@ -95,11 +101,7 @@ class Settings(BaseSettings):
         default=True,
         description="이미지 처리 허용 여부"
     )
-    welcome_message: str = Field(
-        default="I am a generous god!",
-        description="welcome 엔드포인트에서 반환할 메시지"
-    )
-    
+
     # 인증 설정
     enable_auth: bool = Field(
         default=False,
@@ -110,12 +112,8 @@ class Settings(BaseSettings):
         default=None,
         description="기본 인증 패스워드 (.htaccess 방식)"
     )
-    htpasswd_file: Optional[Path] = Field(
-        default=None,
-        description=".htpasswd 파일 경로 (Apache ��환성)"
-    )
-    
-    model_config = ConfigDict(
+
+    model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="COMIX_",
         case_sensitive=False,
@@ -125,23 +123,21 @@ class Settings(BaseSettings):
     @field_validator("manga_directory")
     @classmethod
     def validate_manga_directory(cls, v):
-        """manga 디렉토리 경로 검증"""
-        import os
-        
+        """manga 디렉토리 경로 검증
+
+        검증은 항상 수행한다. 테스트 환경을 위한 예외 처리는 전역 설정을
+        만드는 _create_settings 에서만 한다 (설정 검증 자체를 테스트할 수 있도록).
+        """
         if isinstance(v, str):
             v = Path(v)
-        
-        # 테스트 환경에서는 검증 우회
-        if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("COMIX_DEBUG_MODE") == "true":
-            return v
-        
+
         # 디렉토리 존재 여부만 확인 (생성하지 않음)
         if not v.exists():
             raise ValueError(f"manga 디렉토리가 존재하지 않습니다: {v}")
-        
+
         if not v.is_dir():
             raise ValueError(f"manga_directory는 디렉토리여야 합니다: {v}")
-        
+
         return v
     
     @field_validator("max_file_size")
@@ -191,15 +187,13 @@ class Settings(BaseSettings):
             raise ValueError("최소 하나의 폴백 인코딩이 필요합니다")
         return v
     
-    @field_validator("auth_password")
-    @classmethod
-    def validate_auth_password(cls, v, info):
-        """인증 패스워드 검증 (.htaccess 방식)"""
-        # enable_auth가 True인 경우에만 검증
-        # 하지만 이 시점에서는 다른 필드에 접근할 수 없으므로
-        # 런타임에서 별도로 검증해야 함
-        return v
-    
+    @property
+    def thumbnail_cache_dir(self) -> Path:
+        """썸네일 캐시 디렉토리 (미지정 시 manga 디렉토리 하위 .thumbnails)"""
+        if self.thumbnail_cache_directory:
+            return Path(self.thumbnail_cache_directory)
+        return Path(self.manga_directory) / ".thumbnails"
+
     @property
     def supported_extensions(self) -> List[str]:
         """지원되는 모든 파일 확장자 반환"""
@@ -233,13 +227,11 @@ class Settings(BaseSettings):
         return False
     
     def validate_auth_settings(self) -> None:
-        """인증 설정 검증"""
-        import os
-        
-        # 테스트 환경에서는 검증 우회
-        if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("COMIX_DEBUG_MODE") == "true":
-            return
-            
+        """인증 설정 검증
+
+        디버그 모드에서도 우회하지 않는다. 인증을 켰는데 패스워드가 없거나
+        너무 짧으면 조용히 통과시키는 대신 기동을 실패시킨다.
+        """
         if self.enable_auth:
             if not self.auth_password:
                 raise ValueError("인증이 활성화된 경우 auth_password가 필요합니다")
@@ -247,40 +239,39 @@ class Settings(BaseSettings):
                 raise ValueError("패스워드는 최소 6자 이상이어야 합니다")
 
 
+def _is_test_environment() -> bool:
+    """pytest 실행 중인지 판단
+
+    collection 단계에서는 PYTEST_CURRENT_TEST 가 설정되지 않으므로
+    모듈 로드 여부로 판단한다.
+    """
+    return "pytest" in sys.modules
+
+
 # 전역 설정 인스턴스 생성
-def _create_settings():
+def _create_settings() -> Settings:
     """설정 인스턴스 생성 (테스트 환경 고려)"""
-    import os
-    
-    # 테스트 환경 감지
-    is_test_env = (
-        os.getenv("PYTEST_CURRENT_TEST") is not None or 
-        os.getenv("COMIX_DEBUG_MODE") == "true" or
-        "pytest" in os.getenv("_", "").lower()
-    )
-    
     try:
         settings = Settings()
-        if not is_test_env:
-            settings.validate_auth_settings()
-        return settings
     except Exception as e:
-        if is_test_env:
-            # 테스트 환경에서는 기본값으로 설정 생성
-            import tempfile
-            test_dir = Path(tempfile.gettempdir()) / "test-comix"
-            test_dir.mkdir(exist_ok=True)
-            
-            return Settings(
-                manga_directory=test_dir,
-                debug_mode=True,
-                log_level="DEBUG",
-                enable_auth=False
-            )
-        else:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"설정 생성 오류: {e}")
+        if not _is_test_environment():
+            logging.getLogger(__name__).error(f"설정 생성 오류: {e}")
             raise
+
+        # 테스트 환경에서만 임시 디렉토리로 최소 설정을 만든다.
+        # 운영 환경에서는 설정 오류를 그대로 노출한다 (인증이 조용히 꺼지는 것 방지).
+        test_dir = Path(tempfile.gettempdir()) / "test-comix"
+        test_dir.mkdir(exist_ok=True)
+
+        return Settings(
+            manga_directory=test_dir,
+            debug_mode=True,
+            log_level="DEBUG",
+            enable_auth=False
+        )
+
+    settings.validate_auth_settings()
+    return settings
+
 
 settings = _create_settings()

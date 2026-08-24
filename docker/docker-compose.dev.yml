@@ -35,6 +35,9 @@ services:
       # 개발용 설정 및 로그
       - "./dev-config:/app/config:rw"
       - "./dev-logs:/app/logs:rw"
+
+      # 썸네일 캐시 (manga 디렉토리가 읽기 전용이라 별도 볼륨이 필요하다)
+      - "dev-cache:/app/cache"
     
     # 개발 환경 변수
     environment:

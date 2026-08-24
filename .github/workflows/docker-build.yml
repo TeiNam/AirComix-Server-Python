@@ -16,7 +16,12 @@ env:
   IMAGE_NAME: aircomix-server
 
 jobs:
+  # 테스트가 통과하지 않으면 이미지를 빌드/푸시하지 않는다
+  test:
+    uses: ./.github/workflows/test.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read

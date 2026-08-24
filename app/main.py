@@ -15,11 +15,11 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin_router, router
+from app.api.routes import admin_router, router, thumbnail_service
 from app.models.config import settings
 from app.utils.logging import get_logger, setup_logging
 from app.exception_handlers import register_exception_handlers
-from app.services import FileWatcherService, ThumbnailService, ArchiveService
+from app.services import FileWatcherService
 from app.middleware import BasicAuthMiddleware
 
 
@@ -35,10 +35,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"디버그 모드: {settings.debug_mode}")
     
     # 파일 감시 서비스 시작
-    archive_service = ArchiveService()
-    thumbnail_service = ThumbnailService(archive_service)
+    # 썸네일 서비스는 라우터와 동일한 인스턴스를 사용한다 (캐시/맵핑 상태 공유)
     file_watcher = FileWatcherService(thumbnail_service)
-    
+
     await file_watcher.start_watching()
     logger.info("파일 시스템 감시 서비스 시작됨")
     
