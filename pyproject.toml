@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "comix-server"
-version = "1.0.2"
+version = "1.0.3"
 description = "Python port of comix-server for streaming comic books to AirComix iOS app"
 readme = "README.md"
 license = "MIT"
