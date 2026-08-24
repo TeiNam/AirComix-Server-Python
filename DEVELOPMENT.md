@@ -211,3 +211,35 @@ tail -f logs/comix-server.log
 open htmlcov/index.html  # macOS
 xdg-open htmlcov/index.html  # Linux
 ```
+## 릴리스
+
+버전의 단일 출처는 `pyproject.toml` 이다. `app.__version__` 은 설치된 패키지
+메타데이터에서 읽고, 이미지 라벨은 CI 가 빌드 시점에 찍는다. 버전 문자열을
+손으로 고칠 곳은 없다.
+
+```bash
+make version       # 현재 버전 확인
+make bump-patch    # +0.0.1  (1.0.2 → 1.0.3)  버그 수정
+make bump-minor    # +0.1.0  (1.0.2 → 1.1.0)  기능 추가
+make bump-major    # +1.0.0  (1.0.2 → 2.0.0)  호환성 깨짐
+```
+
+증가 명령은 `pyproject.toml` 과 `uv.lock` 을 함께 갱신한다. 이후 절차:
+
+```bash
+git switch -c release/v1.0.3
+make bump-patch
+git commit -am "chore: 버전 1.0.3"
+git push -u origin release/v1.0.3
+gh pr create --fill && gh pr merge --squash --delete-branch
+
+git switch main && git pull
+gh release create v1.0.3 --target main --notes "..."
+```
+
+릴리스를 발행하면 `release.yml` 이 Docker Hub 와 ghcr 양쪽에 `latest`,
+`1.0.3`, `1.0`, `1` 을 푸시한다.
+
+> **주의**: `docker-build.yml` 은 main 에 푸시할 때마다 `latest` 를
+> `vX.Y.Z-preview` 빌드로 덮는다. 릴리스 이후 main 에 머지가 들어가면
+> `latest` 는 다시 preview 를 가리킨다.

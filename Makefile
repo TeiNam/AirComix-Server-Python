@@ -255,3 +255,14 @@ info: ## 시스템 정보 표시
 	@echo ""
 	@echo "실행 중인 컨테이너:"
 	@docker ps | grep comix || echo "실행 중인 컨테이너가 없습니다."
+version: ## 현재 버전 표시
+	@uv version --short
+
+bump-patch: ## 패치 버전 증가 (+0.0.1)
+	@uv version --bump patch
+
+bump-minor: ## 마이너 버전 증가 (+0.1.0)
+	@uv version --bump minor
+
+bump-major: ## 메이저 버전 증가 (+1.0.0)
+	@uv version --bump major
