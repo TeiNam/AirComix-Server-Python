@@ -8,7 +8,7 @@ from urllib.parse import unquote
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
-from app.api.handlers import MangaRequestHandler
+from app.api.handlers import MangaRequestHandler, thumbnail_cache_control
 from app.models.config import settings
 from app.services import FileSystemService, ArchiveService, ImageService
 from app.services.thumbnail import ThumbnailService
@@ -21,9 +21,6 @@ router = APIRouter()
 
 # 관리용 라우터 - 인증이 활성화된 경우에만 앱에 등록된다 (app/main.py 참조)
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
-
-# 썸네일 캐시 유효 기간 (초)
-THUMBNAIL_MAX_AGE = 3600
 
 # 서비스 인스턴스들 생성
 filesystem_service = FileSystemService(Path(settings.manga_directory))
@@ -43,16 +40,6 @@ manga_handler = MangaRequestHandler(
 )
 
 
-def _thumbnail_cache_control() -> str:
-    """썸네일 캐시 헤더
-
-    인증이 켜져 있으면 공유 캐시(프록시)가 응답을 저장해 무인증 클라이언트에게
-    돌려주지 못하도록 private으로 지정한다.
-    """
-    scope = "private" if settings.enable_auth else "public"
-    return f"{scope}, max-age={THUMBNAIL_MAX_AGE}"
-
-
 async def _thumbnail_response(target_path: Path) -> StreamingResponse:
     """썸네일 생성/조회 후 JPEG 응답 생성 (썸네일 엔드포인트 공용)"""
     if not target_path.exists():
@@ -68,7 +55,7 @@ async def _thumbnail_response(target_path: Path) -> StreamingResponse:
         media_type="image/jpeg",
         headers={
             "Content-Length": str(len(thumbnail_data)),
-            "Cache-Control": _thumbnail_cache_control(),
+            "Cache-Control": thumbnail_cache_control(),
         },
     )
 

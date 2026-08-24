@@ -265,3 +265,26 @@ async def test_extract_rejects_oversized_member(monkeypatch):
             await service.extract_file_from_archive(zip_path, "page.jpg")
 
         assert exc_info.value.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_entry_names_are_normalized():
+    """엔트리 이름을 요청 경로와 같은 방식으로 정규화한다
+
+    "./page.jpg" 로 기록된 엔트리는 요청 경로 정규화 때문에 "page.jpg" 로
+    들어오므로, 목록과 추출 양쪽을 같은 기준으로 맞춰야 받을 수 있다.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        zip_path = Path(temp_dir) / "dotted.zip"
+
+        with zipfile.ZipFile(zip_path, 'w') as zip_file:
+            zip_file.writestr("./page001.jpg", b"first")
+            zip_file.writestr("sub//page002.jpg", b"second")
+
+        service = ArchiveService()
+
+        contents = await service.list_archive_contents(zip_path)
+        assert contents == ["page001.jpg", "sub/page002.jpg"]
+
+        for name, expected in [("page001.jpg", b"first"), ("sub/page002.jpg", b"second")]:
+            assert await service.extract_file_from_archive(zip_path, name) == expected

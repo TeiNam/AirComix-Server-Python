@@ -30,9 +30,21 @@ ZIP_UTF8_FLAG = 0x800
 
 
 def _zip_entry_name(entry: "zipfile.ZipInfo") -> str:
-    """ZIP 엔트리의 파일명을 올바른 인코딩으로 복원"""
-    return EncodingUtils.decode_zip_entry_name(
+    """ZIP 엔트리의 파일명을 올바른 인코딩으로 복원하고 경로를 정규화
+
+    요청 경로와 동일한 정규화를 적용해야 "./page.jpg" 처럼 기록된 엔트리도
+    목록에 나온 이름 그대로 요청해서 받을 수 있다.
+    """
+    decoded = EncodingUtils.decode_zip_entry_name(
         entry.filename, bool(entry.flag_bits & ZIP_UTF8_FLAG)
+    )
+    return PathUtils.normalize_path(decoded)
+
+
+def _rar_entry_name(entry) -> str:
+    """RAR 엔트리의 파일명을 변환하고 경로를 정규화"""
+    return PathUtils.normalize_path(
+        EncodingUtils.convert_filename_encoding(entry.filename)
     )
 
 
@@ -162,7 +174,7 @@ class ArchiveService:
                             continue
                         
                         # 파일명 인코딩 변환
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
+                        filename = _rar_entry_name(entry)
                         
                         # 이미지 파일인지 확인
                         if settings.is_image_file(filename):
@@ -295,7 +307,7 @@ class ArchiveService:
                             continue
 
                         # 파일명 인코딩 변환
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
+                        filename = _rar_entry_name(entry)
 
                         if filename == file_path:
                             _ensure_within_size_limit(
@@ -419,7 +431,7 @@ class ArchiveService:
                         if entry.is_dir():
                             continue
                         
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
+                        filename = _rar_entry_name(entry)
                         is_image = settings.is_image_file(filename)
                         
                         if is_image:

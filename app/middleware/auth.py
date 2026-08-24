@@ -139,12 +139,23 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         self._failed_attempts.pop(client_ip, None)
 
     def _prune_expired(self, now: float) -> None:
-        """잠금 기간이 지난 기록 정리 (메모리 무한 증가 방지)"""
-        self._failed_attempts = {
+        """기록 정리 (메모리 무한 증가 방지)
+
+        잠금 기간이 지난 항목을 먼저 버리고, 그래도 상한을 넘으면 오래된 순으로
+        버려 항목 수를 상한 이하로 유지한다.
+        """
+        alive = {
             ip: record
             for ip, record in self._failed_attempts.items()
             if now - record[1] < LOCKOUT_SECONDS
         }
+
+        if len(alive) > MAX_TRACKED_CLIENTS:
+            # 마지막 실패 시각이 오래된 항목부터 버린다
+            newest = sorted(alive.items(), key=lambda item: item[1][1], reverse=True)
+            alive = dict(newest[:MAX_TRACKED_CLIENTS])
+
+        self._failed_attempts = alive
 
     def _unauthorized_response(self) -> Response:
         """401 Unauthorized 응답 생성"""

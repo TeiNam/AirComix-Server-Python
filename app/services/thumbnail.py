@@ -8,6 +8,8 @@ import hashlib
 import json
 import os
 import re
+import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -44,6 +46,8 @@ class ThumbnailService:
         self.thumbnail_cache_dir = settings.thumbnail_cache_dir
         self.thumbnail_size = THUMBNAIL_SIZE
         self.mapping_file = self.thumbnail_cache_dir / "mapping.json"
+        # ponytail: 프로세스 내 맵핑 갱신 직렬화용. 워커 간에는 마지막 저장이 이긴다.
+        self._mapping_lock = threading.Lock()
 
         # 썸네일 캐시 디렉토리 생성
         self._ensure_cache_directory()
@@ -107,16 +111,31 @@ class ThumbnailService:
     def _save_mapping_sync(self, mapping: Dict[str, Any]) -> None:
         """맵핑 파일 저장 (동기, 원자적 교체)
 
-        임시 파일에 쓰고 os.replace 로 바꿔치기한다. 여러 gunicorn 워커가
-        동시에 저장해도 잘린 JSON 이 남지 않는다.
+        고유한 임시 파일에 쓰고 os.replace 로 바꿔치기한다. 동시에 저장해도
+        서로의 임시 파일을 덮어쓰지 않고, 잘린 JSON 이 남지 않는다.
         """
+        temp_path: Optional[Path] = None
+
         try:
-            temp_file = self.mapping_file.with_suffix(f".tmp.{os.getpid()}")
-            with open(temp_file, 'w', encoding='utf-8') as f:
+            handle, temp_name = tempfile.mkstemp(
+                dir=self.thumbnail_cache_dir, prefix="mapping.", suffix=".tmp"
+            )
+            temp_path = Path(temp_name)
+
+            with os.fdopen(handle, 'w', encoding='utf-8') as f:
                 json.dump(mapping, f, ensure_ascii=False, indent=2)
-            os.replace(temp_file, self.mapping_file)
+
+            os.replace(temp_path, self.mapping_file)
+            temp_path = None
+
         except Exception as e:
             logger.error(f"맵핑 파일 저장 실패: {e}")
+        finally:
+            if temp_path is not None and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
 
     async def _load_mapping(self) -> Dict[str, Any]:
         """썸네일 맵핑 파일 로드"""
@@ -135,13 +154,15 @@ class ThumbnailService:
         맵핑을 별도 저장소로 옮긴다.
         """
         def _update() -> None:
-            mapping = self._load_mapping_sync()
-            mapping[thumbnail_hash] = {
-                "original_path": str(target_path),
-                "created_at": time.time(),
-                "file_size": target_path.stat().st_size if target_path.exists() else 0
-            }
-            self._save_mapping_sync(mapping)
+            # 같은 프로세스 안의 동시 갱신은 락으로 직렬화한다
+            with self._mapping_lock:
+                mapping = self._load_mapping_sync()
+                mapping[thumbnail_hash] = {
+                    "original_path": str(target_path),
+                    "created_at": time.time(),
+                    "file_size": target_path.stat().st_size if target_path.exists() else 0
+                }
+                self._save_mapping_sync(mapping)
 
         await asyncio.to_thread(_update)
 
@@ -408,31 +429,33 @@ class ThumbnailService:
             삭제된 썸네일 개수
         """
         def _cleanup() -> int:
-            mapping = self._load_mapping_sync()
-            deleted_count = 0
-            updated_mapping: Dict[str, Any] = {}
+            # 맵핑 읽기-수정-쓰기 구간을 다른 갱신과 직렬화한다
+            with self._mapping_lock:
+                mapping = self._load_mapping_sync()
+                deleted_count = 0
+                updated_mapping: Dict[str, Any] = {}
 
-            for thumbnail_hash, info in mapping.items():
-                # 맵핑 파일이 조작된 경우에도 캐시 디렉토리 밖을 건드리지 않는다
-                if not _is_valid_thumbnail_hash(thumbnail_hash):
-                    logger.warning(f"맵핑에 잘못된 썸네일 키가 있어 무시함: {thumbnail_hash!r}")
-                    continue
+                for thumbnail_hash, info in mapping.items():
+                    # 맵핑 파일이 조작된 경우에도 캐시 디렉토리 밖을 건드리지 않는다
+                    if not _is_valid_thumbnail_hash(thumbnail_hash):
+                        logger.warning(f"맵핑에 잘못된 썸네일 키가 있어 무시함: {thumbnail_hash!r}")
+                        continue
 
-                original_path = Path(info.get("original_path", ""))
-                thumbnail_path = self.thumbnail_cache_dir / f"{thumbnail_hash}.jpg"
+                    original_path = Path(info.get("original_path", ""))
+                    thumbnail_path = self.thumbnail_cache_dir / f"{thumbnail_hash}.jpg"
 
-                # 원본 파일이 존재하면 맵핑 유지
-                if original_path.exists():
-                    updated_mapping[thumbnail_hash] = info
-                    continue
+                    # 원본 파일이 존재하면 맵핑 유지
+                    if original_path.exists():
+                        updated_mapping[thumbnail_hash] = info
+                        continue
 
-                if thumbnail_path.exists():
-                    thumbnail_path.unlink()
-                    deleted_count += 1
-                    logger.info(f"고아 썸네일 삭제: {thumbnail_path} (원본: {original_path})")
+                    if thumbnail_path.exists():
+                        thumbnail_path.unlink()
+                        deleted_count += 1
+                        logger.info(f"고아 썸네일 삭제: {thumbnail_path} (원본: {original_path})")
 
-            self._save_mapping_sync(updated_mapping)
-            return deleted_count
+                self._save_mapping_sync(updated_mapping)
+                return deleted_count
 
         try:
             deleted_count = await asyncio.to_thread(_cleanup)

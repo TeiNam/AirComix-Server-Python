@@ -160,7 +160,40 @@ class EncodingUtils:
             # CP437로 표현할 수 없다면 이미 올바르게 디코딩된 이름이다
             return entry_name
 
-        return EncodingUtils.safe_decode(raw, settings.fallback_encodings)
+        # 설정된 멀티바이트 인코딩으로 "엄격하게" 디코딩되는 경우에만 교체한다.
+        # latin1 처럼 항상 성공하는 단일바이트 인코딩을 쓰면 실제 CP437 이름
+        # (예: é.jpg)이 제어문자로 망가지므로 후보에서 제외한다.
+        for encoding in [settings.source_encoding, *settings.fallback_encodings]:
+            if EncodingUtils._is_single_byte_encoding(encoding):
+                continue
+
+            try:
+                decoded = raw.decode(encoding)
+            except (UnicodeDecodeError, LookupError):
+                continue
+
+            # 파일명에 제어문자가 있으면 잘못 디코딩한 것으로 본다
+            if any(ord(ch) < 0x20 or 0x7F <= ord(ch) < 0xA0 for ch in decoded):
+                continue
+
+            return decoded
+
+        # 복원할 수 없으면 원래 이름을 유지한다 (표준 CP437 이름 보호)
+        return entry_name
+
+    @staticmethod
+    def _is_single_byte_encoding(encoding: str) -> bool:
+        """항상 디코딩에 성공하는 단일바이트 인코딩인지 확인"""
+        import codecs
+
+        try:
+            canonical = codecs.lookup(encoding).name
+        except LookupError:
+            return False
+
+        return canonical in {
+            'latin-1', 'iso8859-1', 'cp1252', 'cp437', 'cp850', 'ascii'
+        }
 
     @staticmethod
     def is_encoding_convertible(text: bytes, source_encoding: str) -> bool:

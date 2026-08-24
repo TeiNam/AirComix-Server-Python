@@ -170,3 +170,20 @@ def test_decode_zip_entry_name_keeps_ascii():
     """ASCII 파일명은 변환하지 않는다"""
     assert EncodingUtils.decode_zip_entry_name("page001.jpg", False) == "page001.jpg"
     assert EncodingUtils.decode_zip_entry_name("", False) == ""
+
+
+def test_decode_zip_entry_name_preserves_real_cp437_name():
+    """실제 CP437 이름은 망가뜨리지 않는다
+
+    "é.jpg" 처럼 표준 CP437로 기록된 이름을 한국어 인코딩으로 재해석하면
+    제어문자가 되어 파일을 요청할 수 없게 된다.
+    """
+    assert EncodingUtils.decode_zip_entry_name("é.jpg", False) == "é.jpg"
+
+
+def test_is_single_byte_encoding():
+    """항상 성공하는 단일바이트 인코딩을 식별한다"""
+    assert EncodingUtils._is_single_byte_encoding("latin1") is True
+    assert EncodingUtils._is_single_byte_encoding("iso-8859-1") is True
+    assert EncodingUtils._is_single_byte_encoding("cp949") is False
+    assert EncodingUtils._is_single_byte_encoding("euc-kr") is False

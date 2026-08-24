@@ -23,14 +23,37 @@ from app.exceptions import (
 
 logger = get_logger(__name__)
 
+# 썸네일 캐시 유효 기간 (초)
+THUMBNAIL_MAX_AGE = 3600
+
 
 def _to_listing_body(names: List[str]) -> str:
     """목록 응답 본문 생성
 
-    응답은 줄바꿈으로 구분되는 프로토콜이므로, 이름에 개행이 들어 있으면
-    가짜 항목이 주입된다. 개행 문자는 공백으로 치환한다.
+    응답은 줄바꿈으로 구분되는 프로토콜이라 이름에 개행이 있으면 가짜 항목이
+    주입된다. 이름을 바꾸면 클라이언트가 요청할 수 없는 이름을 광고하게 되므로
+    해당 항목은 목록에서 제외한다.
     """
-    return "\n".join(name.replace("\r", " ").replace("\n", " ") for name in names)
+    safe_names = []
+    for name in names:
+        if "\r" in name or "\n" in name:
+            logger.warning(f"이름에 개행이 있어 목록에서 제외: {name!r}")
+            continue
+        safe_names.append(name)
+
+    return "\n".join(safe_names)
+
+
+def thumbnail_cache_control() -> str:
+    """썸네일 캐시 헤더
+
+    인증이 켜져 있으면 공유 캐시(프록시)가 응답을 저장해 무인증 클라이언트에게
+    돌려주지 못하도록 private 으로 지정한다.
+    """
+    from app.models.config import settings as global_settings
+
+    scope = "private" if global_settings.enable_auth else "public"
+    return f"{scope}, max-age={THUMBNAIL_MAX_AGE}"
 
 
 class MangaRequestHandler:
@@ -98,12 +121,9 @@ class MangaRequestHandler:
                 logger.warning(f"파일 또는 디렉토리를 찾을 수 없음: {full_path}")
                 raise FileNotFoundError(str(full_path))
                 
-        except (FileNotFoundError, AccessDeniedError, UnsupportedFileTypeError, 
-                PathTraversalError, ArchiveError, ImageProcessingError) as e:
-            # 커스텀 예외는 그대로 재발생 (예외 핸들러에서 처리됨)
-            raise e
-        except HTTPException:
-            # HTTPException은 그대로 재발생
+        except (ComixServerException, HTTPException):
+            # 커스텀 예외(404/403/413 등)와 HTTPException 은 상태코드를 유지한 채 전달.
+            # 개별 예외를 나열하면 새 예외 타입이 500 으로 뭉개진다.
             raise
         except Exception as e:
             logger.error(f"만화 요청 처리 중 오류: {path}, 오류: {e}")
@@ -295,8 +315,7 @@ class MangaRequestHandler:
             headers = {
                 'Content-Type': 'image/jpeg',
                 'Content-Length': str(len(thumbnail_data)),
-                'Cache-Control': 'public, max-age=86400',  # 24시간 캐시
-                'Accept-Ranges': 'bytes'
+                'Cache-Control': thumbnail_cache_control(),
             }
             
             logger.info(f"썸네일 응답: {target_filename}, 크기: {len(thumbnail_data)} bytes")
