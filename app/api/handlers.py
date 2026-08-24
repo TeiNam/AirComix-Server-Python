@@ -4,7 +4,7 @@
 """
 
 from pathlib import Path
-from typing import Union
+from typing import List, Optional, Union
 from urllib.parse import unquote
 
 from fastapi import HTTPException
@@ -16,11 +16,21 @@ from app.services.thumbnail import ThumbnailService
 from app.utils.logging import get_logger
 from app.utils.path import PathUtils
 from app.exceptions import (
+    ComixServerException,
     FileNotFoundError, AccessDeniedError, UnsupportedFileTypeError,
     PathTraversalError, ArchiveError, ImageProcessingError
 )
 
 logger = get_logger(__name__)
+
+
+def _to_listing_body(names: List[str]) -> str:
+    """목록 응답 본문 생성
+
+    응답은 줄바꿈으로 구분되는 프로토콜이므로, 이름에 개행이 들어 있으면
+    가짜 항목이 주입된다. 개행 문자는 공백으로 치환한다.
+    """
+    return "\n".join(name.replace("\r", " ").replace("\n", " ") for name in names)
 
 
 class MangaRequestHandler:
@@ -31,13 +41,15 @@ class MangaRequestHandler:
         settings: Settings,
         filesystem_service: FileSystemService,
         archive_service: ArchiveService,
-        image_service: ImageService
+        image_service: ImageService,
+        thumbnail_service: Optional[ThumbnailService] = None
     ):
         self.settings = settings
         self.filesystem_service = filesystem_service
         self.archive_service = archive_service
         self.image_service = image_service
-        self.thumbnail_service = ThumbnailService(archive_service)
+        # 썸네일 서비스는 외부에서 주입받아 공유한다 (미지정 시에만 생성)
+        self.thumbnail_service = thumbnail_service or ThumbnailService(archive_service)
         self.manga_root = Path(settings.manga_directory)
     
     async def handle_request(self, path: str) -> Union[PlainTextResponse, StreamingResponse]:
@@ -137,7 +149,7 @@ class MangaRequestHandler:
         try:
             archive_path, image_path = PathUtils.extract_archive_and_image_paths(path)
             return bool(archive_path and image_path)
-        except:
+        except Exception:
             return False
     
     async def _handle_archive_image_request(self, path: str) -> StreamingResponse:
@@ -158,7 +170,10 @@ class MangaRequestHandler:
             return await self.image_service.stream_image_from_archive(
                 full_archive_path, image_path
             )
-            
+
+        except (ComixServerException, HTTPException):
+            # 404/400 등 의미가 있는 상태코드는 그대로 전달한다 (500으로 뭉개지 않음)
+            raise
         except Exception as e:
             logger.error(f"아카이브 이미지 요청 처리 중 오류: {path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="아카이브 이미지 처리 오류")
@@ -198,13 +213,12 @@ class MangaRequestHandler:
             
             # 디렉토리 목록 조회
             file_list = await self.filesystem_service.list_directory(relative_path_str)
-            
-            # 줄바꿈으로 구분된 문자열로 변환
-            content = "\n".join(file_list)
-            
+
             logger.info(f"디렉토리 목록 반환: {len(file_list)}개 항목")
-            return PlainTextResponse(content=content)
-            
+            return PlainTextResponse(content=_to_listing_body(file_list))
+
+        except (ComixServerException, HTTPException):
+            raise
         except Exception as e:
             logger.error(f"디렉토리 목록 조회 중 오류: {directory_path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="디렉토리 목록 조회 오류")
@@ -223,13 +237,12 @@ class MangaRequestHandler:
             
             # 아카이브 내용 목록 조회
             image_list = await self.archive_service.list_archive_contents(archive_path)
-            
-            # 줄바꿈으로 구분된 문자열로 변환
-            content = "\n".join(image_list)
-            
+
             logger.info(f"아카이브 목록 반환: {len(image_list)}개 이미지")
-            return PlainTextResponse(content=content)
-            
+            return PlainTextResponse(content=_to_listing_body(image_list))
+
+        except (ComixServerException, HTTPException):
+            raise
         except Exception as e:
             logger.error(f"아카이브 목록 조회 중 오류: {archive_path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="아카이브 목록 조회 오류")
@@ -294,10 +307,9 @@ class MangaRequestHandler:
                 headers=headers
             )
             
-        except (FileNotFoundError, AccessDeniedError, UnsupportedFileTypeError, 
-                PathTraversalError) as e:
-            # 커스텀 예외는 그대로 재발생
-            raise e
+        except (ComixServerException, HTTPException):
+            # 커스텀 예외와 HTTPException 은 상태코드를 유지한 채 그대로 전달
+            raise
         except Exception as e:
             logger.error(f"썸네일 요청 처리 중 오류: {path}, 오류: {e}")
             raise HTTPException(status_code=500, detail="썸네일 처리 오류")

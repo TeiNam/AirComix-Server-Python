@@ -15,7 +15,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import router
+from app.api.routes import admin_router, router
 from app.models.config import settings
 from app.utils.logging import get_logger, setup_logging
 from app.exception_handlers import register_exception_handlers
@@ -62,12 +62,16 @@ def create_app() -> FastAPI:
     logger = get_logger(__name__)
     
     # FastAPI 앱 생성
+    # API 문서는 디버그 모드에서만 노출한다 (프로덕션에서 엔드포인트 목록 노출 방지)
     app = FastAPI(
         title="Comix Server",
         description="Python port of comix-server for streaming comic books to AirComix iOS app",
         version="1.0.0",
         lifespan=lifespan,
         debug=settings.debug_mode,
+        docs_url="/docs" if settings.debug_mode else None,
+        redoc_url="/redoc" if settings.debug_mode else None,
+        openapi_url="/openapi.json" if settings.debug_mode else None,
     )
     
     # 인증 미들웨어 설정
@@ -77,18 +81,28 @@ def create_app() -> FastAPI:
         logger.info("패스워드 인증 활성화됨")
     
     # CORS 미들웨어 설정 (디버그 모드에서만)
+    # allow_origins=["*"] 와 allow_credentials=True 조합은 브라우저가 거부하는 무효 조합이므로
+    # 자격증명 전송은 허용하지 않는다 (AirComix 앱은 CORS 대상이 아니라 영향 없음)
     if settings.debug_mode:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
-            allow_credentials=True,
+            allow_credentials=False,
             allow_methods=["*"],
             allow_headers=["*"],
         )
         logger.info("CORS 미들웨어 활성화됨 (디버그 모드)")
-    
+
     # 라우터 포함
     app.include_router(router)
+
+    # 관리용 엔드포인트는 보호 수단이 있을 때만 노출한다.
+    # 인증이 꺼져 있으면 캐시 삭제 같은 파괴적 작업이 무인증으로 열리므로 등록하지 않는다.
+    if settings.enable_auth:
+        app.include_router(admin_router)
+        logger.info("관리 엔드포인트 활성화됨 (/admin/*)")
+    else:
+        logger.info("인증이 비활성화되어 관리 엔드포인트를 등록하지 않음")
     
     # 예외 핸들러 등록
     register_exception_handlers(app)

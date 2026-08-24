@@ -50,17 +50,14 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       
-      # 개발용 설정
-      - COMIX_RELOAD=true
-      - COMIX_DEV_MODE=true
-      
       # 파일 필터링 (개발용 - 더 관대한 설정)
       - COMIX_HIDDEN_FILES=[".", "..", "@eaDir", "Thumbs.db", ".DS_Store", ".thumbnails", "*.thm"]
       - COMIX_HIDDEN_PATTERNS=["__MACOSX", "*.tmp"]
       
       # 인증 설정 (개발용)
+      # 기본 패스워드를 두지 않는다. 인증을 켜려면 COMIX_AUTH_PASSWORD 를 직접 지정한다.
       - COMIX_ENABLE_AUTH=${COMIX_ENABLE_AUTH:-false}
-      - COMIX_AUTH_PASSWORD=${COMIX_AUTH_PASSWORD:-password123}
+      - COMIX_AUTH_PASSWORD=${COMIX_AUTH_PASSWORD}
       
       # Python 경로 설정
       - PYTHONPATH=/app
