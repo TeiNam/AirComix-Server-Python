@@ -32,7 +32,9 @@ async def comix_server_exception_handler(
         적절한 HTTP 응답
     """
     # 요청 정보 로깅
-    logger.error(
+    # 404/403 같은 클라이언트 오류는 서버 오류가 아니므로 WARNING 으로 남긴다
+    log = logger.error if exc.status_code >= 500 else logger.warning
+    log(
         f"ComixServerException 발생: {exc.message} "
         f"(상태코드: {exc.status_code}) "
         f"요청: {request.method} {request.url}"
