@@ -78,17 +78,21 @@ class FileSystemService:
                 logger.error(f"디렉토리 읽기 실패: {full_path}, 오류: {e}")
                 return []
             
-            # 필터링된 목록 생성
+            # 필터링된 목록 생성 (디렉토리 여부를 함께 수집해 정렬에서 재조회하지 않는다)
             filtered_entries = []
             for entry in entries:
-                if await self._is_entry_supported(full_path / entry, entry):
-                    filtered_entries.append(entry)
-            
+                entry_path = full_path / entry
+                if not await self._is_entry_supported(entry_path, entry):
+                    continue
+                is_directory = await aiofiles.os.path.isdir(entry_path)
+                filtered_entries.append((not is_directory, entry.lower(), entry))
+
             # 정렬 (디렉토리 먼저, 그 다음 파일명 순)
-            filtered_entries.sort(key=lambda x: (not Path(full_path / x).is_dir(), x.lower()))
-            
-            logger.debug(f"필터링된 항목 수: {len(filtered_entries)}")
-            return filtered_entries
+            filtered_entries.sort()
+            sorted_names = [entry for _, _, entry in filtered_entries]
+
+            logger.debug(f"필터링된 항목 수: {len(sorted_names)}")
+            return sorted_names
             
         except Exception as e:
             logger.error(f"디렉토리 목록 조회 실패: {path}, 오류: {e}")

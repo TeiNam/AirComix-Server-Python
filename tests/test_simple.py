@@ -14,16 +14,18 @@ def test_basic_python():
     assert "hello" == "hello"
 
 
-def test_environment_variables():
-    """환경 변수 테스트"""
-    manga_dir = os.getenv("COMIX_MANGA_DIRECTORY")
-    debug_mode = os.getenv("COMIX_DEBUG_MODE")
-    
-    print(f"MANGA_DIR: {manga_dir}")
-    print(f"DEBUG_MODE: {debug_mode}")
-    
-    assert manga_dir is not None
-    assert debug_mode == "true"
+def test_settings_load():
+    """설정이 로드되는지 테스트
+
+    주변 환경 변수 유무에 의존하지 않는다. 환경 변수가 없으면 기본값으로
+    설정이 만들어져야 한다.
+    """
+    from app.models.config import settings
+
+    assert settings.manga_directory is not None
+    assert 1 <= settings.server_port <= 65535
+    assert settings.image_extensions
+    assert settings.archive_extensions
 
 
 def test_temp_directory():

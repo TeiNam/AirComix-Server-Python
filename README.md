@@ -155,7 +155,12 @@ docker pull ghcr.io/[사용자명]/aircomix-server:dev
 | `COMIX_DEBUG_MODE` | `false` | 디버그 모드 |
 | `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 |
 | `COMIX_ENABLE_AUTH` | `false` | 기본 인증 활성화 |
-| `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 (.htaccess 방식, 인증 활성화 시 필수) |
+| `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 (.htaccess 방식, 인증 활성화 시 필수, 최소 6자) |
+| `COMIX_THUMBNAIL_CACHE_DIRECTORY` | `<manga>/.thumbnails` | 썸네일 캐시 경로 (읽기 전용 마운트 시 필수) |
+| `COMIX_MAX_FILE_SIZE` | `104857600` | 스트리밍 최대 파일 크기 (바이트) |
+
+> 목록형 설정(`COMIX_HIDDEN_FILES`, `COMIX_IMAGE_EXTENSIONS` 등)은 JSON 배열
+> 문자열로 넘겨야 합니다. 예: `COMIX_IMAGE_EXTENSIONS=["jpg", "png"]`
 
 ### 인증 설정
 

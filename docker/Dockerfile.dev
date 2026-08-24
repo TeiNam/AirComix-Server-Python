@@ -1,7 +1,10 @@
 # Development Dockerfile for Comix Server Python Port
 # 개발 환경용 - 핫 리로드 및 디버깅 지원
 
-FROM python:3.11-slim as development
+FROM python:3.11-slim AS development
+
+# uv 는 버전을 고정해야 빌드가 재현된다
+COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 
 # 메타데이터 라벨
 LABEL maintainer="Comix Server Team" \
@@ -12,7 +15,10 @@ LABEL maintainer="Comix Server Team" \
 # 개발 환경 변수 설정
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
     COMIX_DEBUG_MODE=true \
     COMIX_LOG_LEVEL=DEBUG \
     COMIX_MANGA_DIRECTORY=/comix \
@@ -33,20 +39,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 애플리케이션 디렉토리 생성
 WORKDIR /app
 
-# 먼저 의존성 파일만 복사하여 레이어 캐싱 최적화
-COPY pyproject.toml ./
+# 의존성만 먼저 설치한다.
+# 소스 코드가 바뀌어도 pyproject.toml/uv.lock 이 그대로면 이 레이어는 재사용된다.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-install-project --extra dev
 
-# 기본 의존성만 먼저 설치
-RUN pip install --upgrade pip setuptools wheel
-
-# 소스 코드 복사
+# 소스 코드 복사 후 프로젝트를 editable 로 설치 (핫 리로드용)
 COPY app/ ./app/
 COPY images/ ./images/
 COPY README.md ./
-
-# 개발 의존성 설치 (editable mode) 및 캐시 정리
-RUN pip install -e ".[dev]" && \
-    rm -rf ~/.cache/pip /tmp/pip-* || true
+RUN uv sync --locked --extra dev
 
 # 보안을 위한 비루트 사용자 생성
 RUN groupadd -r -g 1000 comix && \

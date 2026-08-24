@@ -13,13 +13,14 @@ from fastapi.testclient import TestClient
 class TestRootEndpoint:
     """루트 엔드포인트 테스트"""
     
-    def test_get_root_directory_name(self, client: TestClient):
+    def test_get_root_directory_name(self, client: TestClient, override_settings):
         """루트 디렉토리 이름 반환 테스트"""
         response = client.get("/")
-        
+
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
-        assert response.text == "comix"
+        # 실제 manga 디렉토리 이름을 그대로 반환한다
+        assert response.text == Path(override_settings.manga_directory).name
     
     def test_get_root_directory_name_with_custom_name(self, temp_manga_dir: Path, monkeypatch):
         """커스텀 디렉토리 이름 테스트"""

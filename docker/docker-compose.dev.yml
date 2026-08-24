@@ -1,8 +1,6 @@
 # Development Docker Compose Configuration
 # 개발 환경용 - 핫 리로드 및 디버깅 지원
 
-version: '3.8'
-
 services:
   comix-server-dev:
     build:
@@ -35,6 +33,9 @@ services:
       # 개발용 설정 및 로그
       - "./dev-config:/app/config:rw"
       - "./dev-logs:/app/logs:rw"
+
+      # 썸네일 캐시 (manga 디렉토리가 읽기 전용이라 별도 볼륨이 필요하다)
+      - "dev-cache:/app/cache"
     
     # 개발 환경 변수
     environment:
@@ -50,17 +51,14 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       
-      # 개발용 설정
-      - COMIX_RELOAD=true
-      - COMIX_DEV_MODE=true
-      
       # 파일 필터링 (개발용 - 더 관대한 설정)
       - COMIX_HIDDEN_FILES=[".", "..", "@eaDir", "Thumbs.db", ".DS_Store", ".thumbnails", "*.thm"]
       - COMIX_HIDDEN_PATTERNS=["__MACOSX", "*.tmp"]
       
       # 인증 설정 (개발용)
+      # 기본 패스워드를 두지 않는다. 인증을 켜려면 COMIX_AUTH_PASSWORD 를 직접 지정한다.
       - COMIX_ENABLE_AUTH=${COMIX_ENABLE_AUTH:-false}
-      - COMIX_AUTH_PASSWORD=${COMIX_AUTH_PASSWORD:-password123}
+      - COMIX_AUTH_PASSWORD=${COMIX_AUTH_PASSWORD}
       
       # Python 경로 설정
       - PYTHONPATH=/app

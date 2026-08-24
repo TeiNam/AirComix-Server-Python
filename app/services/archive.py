@@ -16,6 +16,7 @@ try:
 except ImportError:
     RARFILE_AVAILABLE = False
 
+from app.exceptions import ArchiveError, ComixServerException, FileTooLargeError
 from app.models.config import settings
 from app.models.data import ArchiveEntry
 from app.utils.logging import get_logger
@@ -23,6 +24,40 @@ from app.utils.encoding import EncodingUtils
 from app.utils.path import PathUtils
 
 logger = get_logger(__name__)
+
+# ZIP 엔트리 파일명이 UTF-8로 기록되었음을 나타내는 플래그
+ZIP_UTF8_FLAG = 0x800
+
+
+def _zip_entry_name(entry: "zipfile.ZipInfo") -> str:
+    """ZIP 엔트리의 파일명을 올바른 인코딩으로 복원하고 경로를 정규화
+
+    요청 경로와 동일한 정규화를 적용해야 "./page.jpg" 처럼 기록된 엔트리도
+    목록에 나온 이름 그대로 요청해서 받을 수 있다.
+    """
+    decoded = EncodingUtils.decode_zip_entry_name(
+        entry.filename, bool(entry.flag_bits & ZIP_UTF8_FLAG)
+    )
+    return PathUtils.normalize_path(decoded)
+
+
+def _rar_entry_name(entry) -> str:
+    """RAR 엔트리의 파일명을 변환하고 경로를 정규화"""
+    return PathUtils.normalize_path(
+        EncodingUtils.convert_filename_encoding(entry.filename)
+    )
+
+
+def _ensure_within_size_limit(label: str, size: int) -> None:
+    """설정된 최대 파일 크기를 넘는지 확인
+
+    아카이브 멤버는 메모리에 전체를 올린 뒤 스트리밍하므로, 상한을 넘으면
+    읽기 전에 중단해서 메모리 고갈을 막는다.
+    """
+    limit = settings.max_file_size
+    if size > limit:
+        logger.warning(f"최대 파일 크기 초과: {label} ({size} > {limit})")
+        raise FileTooLargeError(label, size, limit)
 
 
 class ArchiveService:
@@ -59,13 +94,11 @@ class ArchiveService:
                 logger.warning(f"지원되지 않는 아카이브 형식: {ext}")
                 return []
                 
+        except ComixServerException:
+            # ArchiveError 등 상태코드가 정해진 예외는 그대로 전달
+            raise
         except Exception as e:
             logger.error(f"아카이브 내용 조회 실패: {archive_path}, 오류: {e}")
-            # ArchiveError는 다시 발생시켜서 핸들러에서 500 에러로 처리되도록 함
-            from app.exceptions import ArchiveError
-            if isinstance(e, ArchiveError):
-                raise e
-            # 다른 예외는 ArchiveError로 래핑
             raise ArchiveError(f"아카이브 처리 중 오류가 발생했습니다: {e}")
     
     async def _list_zip_contents(self, archive_path: Path) -> List[str]:
@@ -87,14 +120,14 @@ class ArchiveService:
                         # 디렉토리는 제외
                         if entry.is_dir():
                             continue
-                        
+
                         # 파일명 인코딩 변환
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
-                        
+                        filename = _zip_entry_name(entry)
+
                         # 이미지 파일인지 확인
                         if settings.is_image_file(filename):
                             image_files.append(filename)
-                
+
                 return image_files
             
             # 스레드 풀에서 실행
@@ -109,11 +142,11 @@ class ArchiveService:
             
         except zipfile.BadZipFile:
             logger.error(f"손상된 ZIP 파일: {archive_path}")
-            from app.exceptions import ArchiveError
             raise ArchiveError(f"손상된 ZIP 파일: {archive_path}")
+        except ComixServerException:
+            raise
         except Exception as e:
             logger.error(f"ZIP 파일 처리 실패: {archive_path}, 오류: {e}")
-            from app.exceptions import ArchiveError
             raise ArchiveError(f"ZIP 파일 처리 실패: {e}")
     
     async def _list_rar_contents(self, archive_path: Path) -> List[str]:
@@ -141,7 +174,7 @@ class ArchiveService:
                             continue
                         
                         # 파일명 인코딩 변환
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
+                        filename = _rar_entry_name(entry)
                         
                         # 이미지 파일인지 확인
                         if settings.is_image_file(filename):
@@ -161,11 +194,11 @@ class ArchiveService:
             
         except rarfile.BadRarFile:
             logger.error(f"손상된 RAR 파일: {archive_path}")
-            from app.exceptions import ArchiveError
             raise ArchiveError(f"손상된 RAR 파일: {archive_path}")
+        except ComixServerException:
+            raise
         except Exception as e:
             logger.error(f"RAR 파일 처리 실패: {archive_path}, 오류: {e}")
-            from app.exceptions import ArchiveError
             raise ArchiveError(f"RAR 파일 처리 실패: {e}")
     
     async def extract_file_from_archive(self, archive_path: Path, file_path: str) -> Optional[bytes]:
@@ -193,7 +226,10 @@ class ArchiveService:
             else:
                 logger.warning(f"지원되지 않는 아카이브 형식: {ext}")
                 return None
-                
+
+        except ComixServerException:
+            # 크기 초과(413) 같은 명시적 오류는 그대로 전달
+            raise
         except Exception as e:
             logger.error(f"파일 추출 실패: {archive_path}:{file_path}, 오류: {e}")
             return None
@@ -213,29 +249,36 @@ class ArchiveService:
             def _extract():
                 with zipfile.ZipFile(archive_path, 'r') as zip_file:
                     # 파일명 매칭 (인코딩 고려)
+                    # 목록 응답과 동일한 이름으로 정확히 일치하는 엔트리만 추출한다.
+                    # 끝부분 매칭은 "dir/page.jpg" 가 "page.jpg" 요청에 응답해
+                    # 다른 페이지를 내보내는 문제를 만든다.
                     for entry in zip_file.infolist():
                         if entry.is_dir():
                             continue
-                        
+
                         # 파일명 인코딩 변환
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
-                        
-                        # 파일명이 일치하는지 확인 (끝부분 매칭)
-                        if filename.endswith(file_path) or filename == file_path:
+                        filename = _zip_entry_name(entry)
+
+                        if filename == file_path:
+                            _ensure_within_size_limit(
+                                f"{archive_path.name}/{filename}", entry.file_size
+                            )
                             logger.debug(f"ZIP에서 파일 추출: {filename}")
                             return zip_file.read(entry)
-                
+
                 return None
-            
+
             # 스레드 풀에서 실행
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, _extract)
-            
+
             return data
-            
+
         except zipfile.BadZipFile:
             logger.error(f"손상된 ZIP 파일: {archive_path}")
             return None
+        except ComixServerException:
+            raise
         except Exception as e:
             logger.error(f"ZIP 파일 추출 실패: {archive_path}:{file_path}, 오류: {e}")
             return None
@@ -258,30 +301,34 @@ class ArchiveService:
         try:
             def _extract():
                 with rarfile.RarFile(archive_path, 'r') as rar_file:
-                    # 파일명 매칭 (인코딩 고려)
+                    # 목록 응답과 정확히 일치하는 엔트리만 추출한다 (ZIP과 동일)
                     for entry in rar_file.infolist():
                         if entry.is_dir():
                             continue
-                        
+
                         # 파일명 인코딩 변환
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
-                        
-                        # 파일명이 일치하는지 확인 (끝부분 매칭)
-                        if filename.endswith(file_path) or filename == file_path:
+                        filename = _rar_entry_name(entry)
+
+                        if filename == file_path:
+                            _ensure_within_size_limit(
+                                f"{archive_path.name}/{filename}", entry.file_size
+                            )
                             logger.debug(f"RAR에서 파일 추출: {filename}")
                             return rar_file.read(entry)
-                
+
                 return None
-            
+
             # 스레드 풀에서 실행
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, _extract)
-            
+
             return data
-            
+
         except rarfile.BadRarFile:
             logger.error(f"손상된 RAR 파일: {archive_path}")
             return None
+        except ComixServerException:
+            raise
         except Exception as e:
             logger.error(f"RAR 파일 추출 실패: {archive_path}:{file_path}, 오류: {e}")
             return None
@@ -337,8 +384,8 @@ class ArchiveService:
                     for entry in zip_file.infolist():
                         if entry.is_dir():
                             continue
-                        
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
+
+                        filename = _zip_entry_name(entry)
                         is_image = settings.is_image_file(filename)
                         
                         if is_image:
@@ -384,7 +431,7 @@ class ArchiveService:
                         if entry.is_dir():
                             continue
                         
-                        filename = EncodingUtils.convert_filename_encoding(entry.filename)
+                        filename = _rar_entry_name(entry)
                         is_image = settings.is_image_file(filename)
                         
                         if is_image:

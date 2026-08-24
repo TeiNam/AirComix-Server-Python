@@ -3,8 +3,10 @@
 import pytest
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
+from app.exceptions import FileTooLargeError
 from app.services.image import ImageService
 from app.services.archive import ArchiveService
 from app.models.config import Settings
@@ -15,6 +17,8 @@ def mock_settings():
     """테스트용 설정 객체"""
     settings = Mock(spec=Settings)
     settings.image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'tif', 'tiff', 'bmp']
+    settings.max_file_size = 100 * 1024 * 1024
+    settings.chunk_size = 8192
     return settings
 
 
@@ -242,40 +246,79 @@ class TestImageService:
 
 class TestImageServiceIntegration:
     """ImageService 통합 테스트 클래스"""
-    
+
     @pytest.mark.asyncio
-    async def test_file_streamer_chunks(self, image_service, tmp_path):
-        """파일 스트리머 청크 단위 읽기 테스트"""
-        # 큰 테스트 파일 생성
-        test_file = tmp_path / "large_image.jpg"
-        test_content = b"x" * 1000  # 1KB 파일
-        test_file.write_bytes(test_content)
-        
-        # 작은 청크 크기로 스트리밍
+    async def test_bytes_streamer_chunks(self, image_service):
+        """메모리 데이터 스트리머 청크 단위 전송 테스트"""
+        test_content = b"x" * 1000  # 1KB
+
         chunks = []
-        async for chunk in image_service._file_streamer(test_file, chunk_size=100):
+        async for chunk in image_service._bytes_streamer(test_content, chunk_size=100):
             chunks.append(chunk)
-        
-        # 청크 검증
+
         assert len(chunks) == 10  # 1000 bytes / 100 bytes per chunk
         assert b"".join(chunks) == test_content
-    
+
     @pytest.mark.asyncio
-    async def test_archive_streamer_chunks(self, image_service, mock_archive_service, tmp_path):
-        """아카이브 스트리머 청크 단위 읽기 테스트"""
-        # 테스트 아카이브 파일 생성
+    async def test_bytes_streamer_uses_settings_chunk_size(self, image_service, mock_settings):
+        """청크 크기를 지정하지 않으면 설정값을 사용한다"""
+        mock_settings.chunk_size = 250
+        test_content = b"z" * 1000
+
+        chunks = [chunk async for chunk in image_service._bytes_streamer(test_content)]
+
+        assert len(chunks) == 4
+        assert b"".join(chunks) == test_content
+
+    @pytest.mark.asyncio
+    async def test_stream_image_too_large(self, image_service, mock_settings, tmp_path):
+        """최대 파일 크기를 초과하면 413 을 발생시킨다"""
+        mock_settings.max_file_size = 10
+
+        test_image = tmp_path / "big.jpg"
+        test_image.write_bytes(b"x" * 100)
+
+        with pytest.raises(FileTooLargeError) as exc_info:
+            await image_service.stream_image(test_image)
+
+        assert exc_info.value.status_code == 413
+
+    @pytest.mark.asyncio
+    async def test_stream_image_from_archive_extract_failure(
+        self, image_service, mock_archive_service, tmp_path
+    ):
+        """추출이 실패하면 스트리밍을 시작하지 않고 404 를 반환한다"""
         test_archive = tmp_path / "test.zip"
         test_archive.write_bytes(b"fake archive")
-        
-        # 큰 이미지 데이터 모의
-        test_image_data = b"y" * 1000  # 1KB 이미지
-        mock_archive_service.extract_file_from_archive = AsyncMock(return_value=test_image_data)
-        
-        # 작은 청크 크기로 스트리밍
-        chunks = []
-        async for chunk in image_service._archive_streamer(test_archive, "test.jpg", chunk_size=100):
-            chunks.append(chunk)
-        
-        # 청크 검증
-        assert len(chunks) == 10  # 1000 bytes / 100 bytes per chunk
-        assert b"".join(chunks) == test_image_data
+
+        mock_archive_service.list_archive_contents = AsyncMock(return_value=["page001.jpg"])
+        mock_archive_service.extract_file_from_archive = AsyncMock(return_value=None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await image_service.stream_image_from_archive(test_archive, "page001.jpg")
+
+        assert exc_info.value.status_code == 404
+
+    def test_stream_image_supports_range_request(self, image_service, tmp_path):
+        """직접 이미지 요청은 Range 요청을 실제로 처리한다 (206 + Content-Range)"""
+        test_image = tmp_path / "page.jpg"
+        test_content = bytes(range(256))
+        test_image.write_bytes(test_content)
+
+        app = FastAPI()
+
+        @app.get("/image")
+        async def serve_image():
+            return await image_service.stream_image(test_image)
+
+        client = TestClient(app)
+
+        full = client.get("/image")
+        assert full.status_code == 200
+        assert full.headers["Content-Length"] == str(len(test_content))
+        assert full.headers["accept-ranges"] == "bytes"
+
+        partial = client.get("/image", headers={"Range": "bytes=0-9"})
+        assert partial.status_code == 206
+        assert partial.content == test_content[:10]
+        assert partial.headers["content-range"] == f"bytes 0-9/{len(test_content)}"

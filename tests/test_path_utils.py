@@ -13,12 +13,12 @@ from app.utils.path import PathUtils
 def test_normalize_path():
     """경로 정규화 테스트"""
     # 기본 정규화
-    assert PathUtils.normalize_path("/comix/series/volume1") == "manga/series/volume1"
+    assert PathUtils.normalize_path("/comix/series/volume1") == "comix/series/volume1"
     assert PathUtils.normalize_path("manga//series///volume1") == "manga/series/volume1"
     assert PathUtils.normalize_path("manga\\series\\volume1") == "manga/series/volume1"
     
     # 공백 처리
-    assert PathUtils.normalize_path("  /comix/series/  ") == "manga/series"
+    assert PathUtils.normalize_path("  /comix/series/  ") == "comix/series"
     assert PathUtils.normalize_path("") == ""
     
     # 특수 경우
@@ -111,7 +111,7 @@ def test_is_archive_path():
 def test_join_path():
     """경로 결합 테스트"""
     assert PathUtils.join_path("manga", "series", "volume1") == "manga/series/volume1"
-    assert PathUtils.join_path("/comix/", "/series/", "/volume1/") == "manga/series/volume1"
+    assert PathUtils.join_path("/comix/", "/series/", "/volume1/") == "comix/series/volume1"
     assert PathUtils.join_path("manga", "", "volume1") == "manga/volume1"
     assert PathUtils.join_path("", "", "") == ""
     assert PathUtils.join_path("manga") == "manga"
@@ -168,3 +168,30 @@ def test_edge_cases():
     normalized = PathUtils.normalize_path(special_path)
     assert "series with spaces" in normalized
     assert "volume[1].zip" in normalized
+
+def test_extract_archive_paths_uses_segment_boundary():
+    """아카이브 경계는 경로 세그먼트 단위로 판단한다
+
+    확장자 문자열을 그대로 검색하면 내부 파일명에 섞인 ".zip" 을
+    아카이브 경계로 착각한다.
+    """
+    # 내부 파일명에 다른 아카이브 확장자가 섞인 경우
+    archive_path, image_path = PathUtils.extract_archive_and_image_paths(
+        "series/book.rar/page.zip.jpg"
+    )
+    assert archive_path == "series/book.rar"
+    assert image_path == "page.zip.jpg"
+
+    # 확장자 순서(zip -> cbz -> rar -> cbr)가 아니라 앞쪽 경계를 선택한다
+    archive_path, image_path = PathUtils.extract_archive_and_image_paths(
+        "series/volume1.rar/inner.zip"
+    )
+    assert archive_path == "series/volume1.rar"
+    assert image_path == "inner.zip"
+
+    # 디렉토리 이름에 확장자 문자열이 포함된 경우에도 오분리하지 않는다
+    archive_path, image_path = PathUtils.extract_archive_and_image_paths(
+        "zipped-series/cover.jpg"
+    )
+    assert archive_path == "zipped-series/cover.jpg"
+    assert image_path == ""

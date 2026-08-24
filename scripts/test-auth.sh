@@ -62,12 +62,13 @@ SERVER_PID=$!
 # 서버 시작 대기
 sleep 3
 
-# 인증 없이 접근 테스트 (실패해야 함)
-echo -e "${YELLOW}인증 없이 접근 테스트 (401 에러 예상)...${NC}"
-if curl -s -f "${SERVER_URL}/health" > /dev/null; then
-    echo -e "${RED}❌ 인증 없이 접근 성공 (문제!)${NC}"
+# 인증 없이 만화 목록 접근 테스트 (실패해야 함)
+# 루트 목록(/comix/)도 인증 대상이다. 인증 제외는 /, /welcome.102, /health 뿐이다.
+echo -e "${YELLOW}인증 없이 만화 목록 접근 테스트 (401 에러 예상)...${NC}"
+if curl -s -f "${SERVER_URL}/comix/" > /dev/null; then
+    echo -e "${RED}❌ 인증 없이 만화 목록 접근 성공 (문제!)${NC}"
 else
-    echo -e "${GREEN}✅ 인증 없이 접근 차단됨 (정상)${NC}"
+    echo -e "${GREEN}✅ 인증 없이 만화 목록 차단됨 (정상)${NC}"
 fi
 
 # 잘못된 인증으로 접근 테스트

@@ -36,10 +36,17 @@ def test_manga_directory_validation():
         settings = Settings(manga_directory=manga_dir)
         assert settings.manga_directory == manga_dir
         
-        # 존재하지 않는 디렉토리 (자동 생성)
+        # 존재하지 않는 디렉토리는 검증 실패 (디렉토리를 임의로 만들지 않는다)
         new_dir = Path(temp_dir) / "new_manga"
-        settings = Settings(manga_directory=new_dir)
-        assert settings.manga_directory.exists()
+        with pytest.raises(ValidationError):
+            Settings(manga_directory=new_dir)
+        assert not new_dir.exists()
+
+        # 디렉토리가 아닌 경로도 거부한다
+        not_a_dir = Path(temp_dir) / "file.txt"
+        not_a_dir.write_text("not a directory")
+        with pytest.raises(ValidationError):
+            Settings(manga_directory=not_a_dir)
 
 
 def test_port_validation():

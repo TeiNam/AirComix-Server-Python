@@ -131,6 +131,71 @@ class EncodingUtils:
         return EncodingUtils.detect_and_convert_encoding(filename)
     
     @staticmethod
+    def decode_zip_entry_name(entry_name: str, is_utf8_flagged: bool) -> str:
+        """
+        ZIP 엔트리 파일명을 올바른 인코딩으로 복원
+
+        ZIP 스펙은 UTF-8 플래그가 없는 파일명을 CP437로 규정하고 zipfile도 그렇게
+        디코딩한다. 한국어 압축 파일은 실제로 CP949/EUC-KR로 기록되어 있어서
+        그대로 쓰면 파일명이 깨진다. CP437 바이트로 되돌린 뒤 설정된 인코딩으로
+        다시 디코딩한다.
+
+        Args:
+            entry_name: zipfile이 디코딩한 파일명
+            is_utf8_flagged: ZIP 엔트리에 UTF-8 플래그(0x800)가 설정되어 있는지
+
+        Returns:
+            str: 복원된 파일명
+        """
+        if not entry_name or is_utf8_flagged:
+            return entry_name
+
+        # ASCII 이름은 어떤 인코딩에서도 동일하므로 변환하지 않는다
+        if entry_name.isascii():
+            return entry_name
+
+        try:
+            raw = entry_name.encode('cp437')
+        except UnicodeEncodeError:
+            # CP437로 표현할 수 없다면 이미 올바르게 디코딩된 이름이다
+            return entry_name
+
+        # 설정된 멀티바이트 인코딩으로 "엄격하게" 디코딩되는 경우에만 교체한다.
+        # latin1 처럼 항상 성공하는 단일바이트 인코딩을 쓰면 실제 CP437 이름
+        # (예: é.jpg)이 제어문자로 망가지므로 후보에서 제외한다.
+        for encoding in [settings.source_encoding, *settings.fallback_encodings]:
+            if EncodingUtils._is_single_byte_encoding(encoding):
+                continue
+
+            try:
+                decoded = raw.decode(encoding)
+            except (UnicodeDecodeError, LookupError):
+                continue
+
+            # 파일명에 제어문자가 있으면 잘못 디코딩한 것으로 본다
+            if any(ord(ch) < 0x20 or 0x7F <= ord(ch) < 0xA0 for ch in decoded):
+                continue
+
+            return decoded
+
+        # 복원할 수 없으면 원래 이름을 유지한다 (표준 CP437 이름 보호)
+        return entry_name
+
+    @staticmethod
+    def _is_single_byte_encoding(encoding: str) -> bool:
+        """항상 디코딩에 성공하는 단일바이트 인코딩인지 확인"""
+        import codecs
+
+        try:
+            canonical = codecs.lookup(encoding).name
+        except LookupError:
+            return False
+
+        return canonical in {
+            'latin-1', 'iso8859-1', 'cp1252', 'cp437', 'cp850', 'ascii'
+        }
+
+    @staticmethod
     def is_encoding_convertible(text: bytes, source_encoding: str) -> bool:
         """
         특정 인코딩으로 변환 가능한지 확인 (PHP 버전 호환성)

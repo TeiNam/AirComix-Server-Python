@@ -122,9 +122,7 @@ class TestConfigGenerator:
         paths = {}
         
         # docker-compose.yml
-        docker_compose_content = """version: '3.8'
-
-services:
+        docker_compose_content = """services:
   comix-server:
     build: .
     ports:

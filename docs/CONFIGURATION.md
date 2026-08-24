@@ -71,41 +71,84 @@ Comix Server는 다음 순서로 설정을 로드합니다:
   export COMIX_LOG_LEVEL="DEBUG"
   ```
 
+### 목록형 설정 형식 (중요)
+
+목록을 받는 설정은 **JSON 배열 문자열**로 지정해야 합니다.
+`jpg,jpeg,png` 처럼 쉼표로 구분하면 설정 파싱이 실패하고 **서버가 기동하지 않습니다**.
+
+```bash
+# 올바른 형식
+export COMIX_IMAGE_EXTENSIONS='["jpg", "jpeg", "png"]'
+
+# 잘못된 형식 (기동 실패)
+export COMIX_IMAGE_EXTENSIONS="jpg,jpeg,png"
+```
+
 ### 파일 필터링 설정
 
 #### `COMIX_HIDDEN_FILES`
-- **기본값**: `".,..,.DS_Store,Thumbs.db,@eaDir"`
-- **설명**: 숨길 파일명 목록 (쉼표 구분)
+- **기본값**: `[".", "..", "@eaDir", "Thumbs.db", ".DS_Store", ".thumbnails"]`
+- **설명**: 숨길 파일명 목록 (정확히 일치하는 이름, JSON 배열)
 - **예제**:
   ```bash
-  export COMIX_HIDDEN_FILES=".DS_Store,Thumbs.db,desktop.ini"
+  export COMIX_HIDDEN_FILES='[".DS_Store", "Thumbs.db", "desktop.ini"]'
   ```
 
 #### `COMIX_HIDDEN_PATTERNS`
-- **기본값**: `"__MACOSX"`
-- **설명**: 숨길 디렉토리 패턴 (쉼표 구분)
+- **기본값**: `["__MACOSX"]`
+- **설명**: 숨길 이름 패턴 목록 (부분 문자열 일치, JSON 배열)
 - **예제**:
   ```bash
-  export COMIX_HIDDEN_PATTERNS="__MACOSX,.git,node_modules"
+  export COMIX_HIDDEN_PATTERNS='["__MACOSX", ".git", "node_modules"]'
   ```
 
 ### 지원 파일 형식
 
 #### `COMIX_IMAGE_EXTENSIONS`
-- **기본값**: `"jpg,jpeg,gif,png,tif,tiff,bmp"`
-- **설명**: 지원할 이미지 파일 확장자 (쉼표 구분)
+- **기본값**: `["jpg", "jpeg", "gif", "png", "tif", "tiff", "bmp"]`
+- **설명**: 지원할 이미지 파일 확장자 (JSON 배열)
 - **예제**:
   ```bash
-  export COMIX_IMAGE_EXTENSIONS="jpg,jpeg,png,gif,webp"
+  export COMIX_IMAGE_EXTENSIONS='["jpg", "jpeg", "png", "gif", "webp"]'
   ```
 
 #### `COMIX_ARCHIVE_EXTENSIONS`
-- **기본값**: `"zip,cbz,rar,cbr"`
-- **설명**: 지원할 아카이브 파일 확장자 (쉼표 구분)
+- **기본값**: `["zip", "cbz", "rar", "cbr"]`
+- **설명**: 지원할 아카이브 파일 확장자 (JSON 배열)
 - **예제**:
   ```bash
-  export COMIX_ARCHIVE_EXTENSIONS="zip,cbz,rar,cbr,7z"
+  export COMIX_ARCHIVE_EXTENSIONS='["zip", "cbz", "rar", "cbr"]'
   ```
+
+### 성능 설정
+
+#### `COMIX_MAX_FILE_SIZE`
+- **기본값**: `104857600` (100MB, 최대 1GB)
+- **설명**: 스트리밍/추출할 최대 파일 크기(바이트). 초과 시 413 을 반환합니다.
+
+#### `COMIX_CHUNK_SIZE`
+- **기본값**: `8192` (최대 1MB)
+- **설명**: 스트리밍 청크 크기(바이트)
+
+#### `COMIX_THUMBNAIL_CACHE_DIRECTORY`
+- **기본값**: 없음 (`<manga_directory>/.thumbnails` 사용)
+- **설명**: 썸네일 캐시 디렉토리. manga 디렉토리를 읽기 전용으로 마운트하는
+  경우(도커 기본 구성) 쓰기 가능한 경로를 지정해야 캐시가 동작합니다.
+- **예제**:
+  ```bash
+  export COMIX_THUMBNAIL_CACHE_DIRECTORY=/app/cache
+  ```
+
+### 인증 설정
+
+#### `COMIX_ENABLE_AUTH`
+- **기본값**: `false`
+- **설명**: HTTP Basic 인증 활성화 여부 (.htaccess 방식으로 패스워드만 확인)
+
+#### `COMIX_AUTH_PASSWORD`
+- **기본값**: 없음
+- **설명**: 인증 패스워드. 인증을 켜면 필수이며 최소 6자입니다.
+  인증 시 `/`, `/welcome.102`, `/health` 를 제외한 모든 경로에 인증이 필요합니다.
 
 ## 설정 파일
 
@@ -125,13 +168,13 @@ COMIX_SERVER_PORT=31257
 COMIX_DEBUG_MODE=false
 COMIX_LOG_LEVEL=INFO
 
-# 파일 필터링
-COMIX_HIDDEN_FILES=.DS_Store,Thumbs.db,@eaDir
-COMIX_HIDDEN_PATTERNS=__MACOSX,.git
+# 파일 필터링 (목록은 JSON 배열)
+COMIX_HIDDEN_FILES=[".DS_Store", "Thumbs.db", "@eaDir"]
+COMIX_HIDDEN_PATTERNS=["__MACOSX", ".git"]
 
-# 지원 파일 형식
-COMIX_IMAGE_EXTENSIONS=jpg,jpeg,png,gif,bmp,tif,tiff
-COMIX_ARCHIVE_EXTENSIONS=zip,cbz,rar,cbr
+# 지원 파일 형식 (목록은 JSON 배열)
+COMIX_IMAGE_EXTENSIONS=["jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff"]
+COMIX_ARCHIVE_EXTENSIONS=["zip", "cbz", "rar", "cbr"]
 ```
 
 ### 설정 파일 우선순위
@@ -220,7 +263,6 @@ GUNICORN_WORKER_CONNECTIONS=1000
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
 
 services:
   comix-server:
@@ -298,19 +340,21 @@ export COMIX_SYSLOG_FACILITY=local0
 #### 메모리 설정
 
 ```bash
-# 큰 파일 처리를 위한 메모리 설정
-export COMIX_MAX_MEMORY_USAGE=1073741824  # 1GB
-export COMIX_CHUNK_SIZE=8192  # 8KB 청크
+# 큰 파일 처리 설정
+export COMIX_MAX_FILE_SIZE=104857600  # 100MB (최대 1GB)
+export COMIX_CHUNK_SIZE=8192          # 8KB 청크
 ```
 
-#### 캐시 설정
+#### 썸네일 캐시 설정
 
 ```bash
-# 파일 시스템 캐시 설정
-export COMIX_ENABLE_CACHE=true
-export COMIX_CACHE_SIZE=1000  # 캐시할 항목 수
-export COMIX_CACHE_TTL=300    # 캐시 유효 시간 (초)
+# 썸네일 캐시 디렉토리 (기본: <manga_directory>/.thumbnails)
+export COMIX_THUMBNAIL_CACHE_DIRECTORY=/var/cache/comix
 ```
+
+썸네일은 원본보다 오래된 경우 자동으로 재생성되고, 원본이 삭제되면
+파일 감시 서비스가 정리합니다. 수동 정리는 인증이 활성화된 경우
+`POST /admin/thumbnail/cleanup`, `DELETE /admin/thumbnail/cache` 로 할 수 있습니다.
 
 ### 보안 설정
 

@@ -20,6 +20,9 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 from tests.fixtures.sample_data import SampleDataGenerator
 
+# 실행 중인 서버를 대상으로 하는 통합 테스트 모듈
+pytestmark = pytest.mark.integration
+
 
 class AirComixCompatibilityTester:
     """AirComix 앱 호환성 테스트 클래스"""
@@ -248,10 +251,35 @@ class AirComixCompatibilityTester:
         return any(filename.lower().endswith(ext) for ext in image_extensions)
 
 
+def _default_server_url() -> str:
+    """테스트 대상 서버 주소 (환경 변수로 변경 가능)"""
+    import os
+
+    return os.getenv("COMIX_TEST_SERVER_URL", "http://localhost:31257")
+
+
+def _is_server_running(base_url: str) -> bool:
+    """서버가 응답하는지 확인"""
+    try:
+        requests.get(base_url, timeout=2)
+        return True
+    except requests.RequestException:
+        return False
+
+
 @pytest.fixture
 def aircomix_tester():
-    """AirComix 호환성 테스터 픽스처"""
-    return AirComixCompatibilityTester()
+    """AirComix 호환성 테스터 픽스처
+
+    이 테스트들은 실제로 기동된 서버를 대상으로 한다. 서버가 없으면 건너뛴다.
+    (예: COMIX_MANGA_DIRECTORY=... python -m app.main 로 띄운 뒤 실행)
+    """
+    base_url = _default_server_url()
+
+    if not _is_server_running(base_url):
+        pytest.skip(f"실행 중인 서버가 없어 건너뜀: {base_url} (COMIX_TEST_SERVER_URL 로 변경 가능)")
+
+    return AirComixCompatibilityTester(base_url)
 
 
 @pytest.fixture

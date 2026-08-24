@@ -9,17 +9,21 @@ AirComix iOS 앱과 100% 호환되는 만화책 스트리밍 서버입니다. CB
 ```bash
 # docker-compose.yml 생성
 cat > docker-compose.yml << EOF
-version: '3.8'
 services:
   aircomix:
     image: aircomix/aircomix-server:latest
     ports:
-      - "31257:8000"
+      - "31257:31257"
     volumes:
-      - /path/to/your/manga:/comix
+      - /path/to/your/manga:/comix:ro
+      # 썸네일 캐시 (없으면 컨테이너를 다시 만들 때마다 재생성된다)
+      - aircomix-cache:/app/cache
     environment:
-      - MANGA_DIRECTORY=/comix
+      - COMIX_MANGA_DIRECTORY=/comix
     restart: unless-stopped
+
+volumes:
+  aircomix-cache:
 EOF
 
 # 서버 시작
@@ -29,24 +33,43 @@ docker-compose up -d
 ### Docker Run 사용
 
 ```bash
+docker volume create aircomix-cache
+
 docker run -d \
   --name aircomix-server \
-  -p 31257:8000 \
-  -v /path/to/your/manga:/comix \
-  -e MANGA_DIRECTORY=/comix \
+  -p 31257:31257 \
+  -v /path/to/your/manga:/comix:ro \
+  -v aircomix-cache:/app/cache \
+  -e COMIX_MANGA_DIRECTORY=/comix \
   --restart unless-stopped \
   aircomix/aircomix-server:latest
 ```
 
+> 썸네일 캐시 기본 경로는 이미지에 `/app/cache` 로 설정되어 있습니다.
+> 만화 디렉토리를 쓰기 가능하게 마운트하고 예전처럼 그 안에 캐시를 두려면
+> `-e COMIX_THUMBNAIL_CACHE_DIRECTORY=/comix/.thumbnails` 를 지정하세요.
+
 ## 📋 환경 변수
+
+모든 서버 설정은 `COMIX_` 접두어가 필요합니다. 접두어가 없는 이름은 무시됩니다.
 
 | 변수명 | 기본값 | 설명 |
 |--------|--------|------|
-| `MANGA_DIRECTORY` | `/comix` | 만화 파일이 있는 디렉토리 경로 (필수) |
-| `DEBUG_MODE` | `false` | 디버그 모드 활성화 |
-| `LOG_LEVEL` | `INFO` | 로그 레벨 (DEBUG, INFO, WARNING, ERROR) |
-| `HIDDEN_FILES` | `.DS_Store,Thumbs.db` | 숨김 파일 목록 |
-| `MAX_IMAGE_SIZE` | `10485760` | 최대 이미지 크기 (바이트) |
+| `COMIX_MANGA_DIRECTORY` | `~/comix` | 만화 파일이 있는 디렉토리 경로 (컨테이너에서는 `/comix`, 필수) |
+| `COMIX_SERVER_PORT` | `31257` | 서버 포트 |
+| `COMIX_DEBUG_MODE` | `false` | 디버그 모드 활성화 (API 문서 노출) |
+| `COMIX_LOG_LEVEL` | `INFO` | 로그 레벨 (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `COMIX_HIDDEN_FILES` | `[".", "..", "@eaDir", "Thumbs.db", ".DS_Store", ".thumbnails"]` | 숨김 파일 목록 (**JSON 배열**) |
+| `COMIX_HIDDEN_PATTERNS` | `["__MACOSX"]` | 숨김 파일 패턴 (**JSON 배열**) |
+| `COMIX_IMAGE_EXTENSIONS` | `["jpg", "jpeg", "gif", "png", "tif", "tiff", "bmp"]` | 이미지 확장자 (**JSON 배열**) |
+| `COMIX_ARCHIVE_EXTENSIONS` | `["zip", "cbz", "rar", "cbr"]` | 아카이브 확장자 (**JSON 배열**) |
+| `COMIX_MAX_FILE_SIZE` | `104857600` | 스트리밍 최대 파일 크기 (바이트, 최대 1GB) |
+| `COMIX_CHUNK_SIZE` | `8192` | 스트리밍 청크 크기 (바이트) |
+| `COMIX_ENABLE_AUTH` | `false` | 기본 인증 활성화 |
+| `COMIX_AUTH_PASSWORD` | - | 인증 패스워드 (인증 활성화 시 필수, 최소 6자) |
+
+> 목록형 설정(`*_FILES`, `*_PATTERNS`, `*_EXTENSIONS`)은 **JSON 배열 문자열**로 넘겨야 합니다.
+> `jpg,jpeg,png` 처럼 콤마로 구분하면 설정 파싱이 실패하고 서버가 기동하지 않습니다.
 
 ## 🔐 인증 설정 (선택사항)
 
@@ -55,7 +78,7 @@ docker run -d \
 ```bash
 docker run -d \
   --name aircomix-server \
-  -p 31257:8000 \
+  -p 31257:31257 \
   -v /path/to/your/manga:/comix \
   -e COMIX_MANGA_DIRECTORY=/comix \
   -e COMIX_ENABLE_AUTH=true \
@@ -76,29 +99,30 @@ docker run -d \
 
 ## 🌐 API 엔드포인트
 
-- `GET /` - 루트 디렉토리 브라우징
-- `GET /browse/{path}` - 디렉토리 탐색
-- `GET /image/{path}` - 이미지 스트리밍
+- `GET /` - 만화 루트 디렉토리 이름 (AirComix 앱이 가장 먼저 호출)
+- `GET /welcome.102` - 서버 기능 정보
+- `GET /comix/{path}` - 디렉토리 목록 / 아카이브 목록 / 이미지 스트리밍 (요청 경로에 따라 분기)
 - `GET /thumbnail/{path}` - 썸네일 생성
-- `GET /info/{path}` - 파일 정보 조회
-- `GET /health` - 헬스체크
+- `GET /{name}.thm` - 최상위 항목 썸네일 (AirComix 앱 호환)
+- `GET /health` - 헬스체크 (인증 제외)
+- `GET|POST|DELETE /admin/thumbnail/*` - 썸네일 캐시 관리 (`COMIX_ENABLE_AUTH=true` 일 때만 등록)
 
 ## 🔧 고급 설정
 
 ### 리소스 제한이 있는 Docker Compose
 
 ```yaml
-version: '3.8'
 services:
   aircomix:
     image: aircomix/aircomix-server:latest
     ports:
-      - "31257:8000"
+      - "31257:31257"
     volumes:
-      - /path/to/your/manga:/comix
+      - /path/to/your/manga:/comix:ro
+      - aircomix-cache:/app/cache
     environment:
-      - MANGA_DIRECTORY=/comix
-      - LOG_LEVEL=INFO
+      - COMIX_MANGA_DIRECTORY=/comix
+      - COMIX_LOG_LEVEL=INFO
     deploy:
       resources:
         limits:
@@ -109,10 +133,13 @@ services:
           cpus: '1.0'
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:31257/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+volumes:
+  aircomix-cache:
 ```
 
 ### nginx 리버스 프록시
@@ -163,7 +190,7 @@ docker stats aircomix-server
    - **주의**: 읽기 전용(`:ro`) 마운트 시 구동 에러 발생 가능
 
 2. **포트 충돌**
-   - 다른 포트 사용: `-p 31258:8000`
+   - 다른 포트 사용: `-p 31258:31257`
 
 3. **메모리 부족**
    - 메모리 제한 증가: `--memory=2g`

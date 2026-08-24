@@ -5,15 +5,25 @@ manga 디렉토리의 파일 변경을 실시간으로 감지하고
 """
 
 import asyncio
+import hashlib
+import tempfile
 from pathlib import Path
-from typing import Optional, Set, Callable, Any
+from typing import Optional, Set, Callable, Any, TextIO
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 from app.models.config import settings
 from app.utils.logging import get_logger
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None
+
 logger = get_logger(__name__)
+
+# 삭제 이벤트 이후 고아 썸네일 정리를 지연시키는 시간 (초)
+CLEANUP_DELAY_SECONDS = 5
 
 
 class MangaFileSystemEventHandler(FileSystemEventHandler):
@@ -110,11 +120,59 @@ class FileWatcherService:
         self.event_handler: Optional[MangaFileSystemEventHandler] = None
         self.is_running = False
         self.loop: Optional[asyncio.AbstractEventLoop] = None
-        
+        self._lock_handle: Optional[TextIO] = None
+        self._cleanup_task: Optional[asyncio.Task] = None
+
         # 이벤트 콜백들
         self.on_file_created_callbacks: Set[Callable] = set()
         self.on_file_deleted_callbacks: Set[Callable] = set()
         self.on_file_modified_callbacks: Set[Callable] = set()
+
+    def _lock_path(self) -> Path:
+        """감시 중복 방지용 락 파일 경로
+
+        manga 디렉토리는 읽기 전용으로 마운트될 수 있으므로 임시 디렉토리에 만든다.
+        """
+        digest = hashlib.md5(str(self.manga_root).encode()).hexdigest()
+        return Path(tempfile.gettempdir()) / f"comix-watcher-{digest}.lock"
+
+    def _acquire_watch_lock(self) -> bool:
+        """파일 감시 단독 실행 권한 획득
+
+        gunicorn 은 워커를 여러 개 띄우므로, 락을 잡은 프로세스 하나만 감시한다.
+        그렇지 않으면 워커 수만큼 썸네일 생성과 정리가 중복 실행된다.
+
+        ponytail: POSIX flock 기반이라 단일 호스트에서만 유효하다. Windows 등
+        fcntl 이 없는 환경에서는 락 없이 진행한다(기존 동작과 동일).
+        """
+        if fcntl is None:
+            return True
+
+        try:
+            handle = open(self._lock_path(), 'w')
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self._lock_handle = handle
+            return True
+        except OSError:
+            try:
+                handle.close()
+            except Exception:
+                pass
+            return False
+
+    def _release_watch_lock(self) -> None:
+        """감시 락 해제"""
+        if self._lock_handle is None:
+            return
+
+        try:
+            if fcntl is not None:
+                fcntl.flock(self._lock_handle, fcntl.LOCK_UN)
+            self._lock_handle.close()
+        except Exception as e:
+            logger.debug(f"감시 락 해제 실패: {e}")
+        finally:
+            self._lock_handle = None
     
     def add_callback(self, event_type: str, callback: Callable) -> None:
         """이벤트 콜백 추가"""
@@ -155,7 +213,12 @@ class FileWatcherService:
             if not self.manga_root.exists():
                 logger.error(f"감시할 디렉토리가 존재하지 않음: {self.manga_root}")
                 return
-            
+
+            # 여러 워커 중 하나만 감시한다
+            if not self._acquire_watch_lock():
+                logger.info("다른 프로세스가 이미 파일 감시 중이므로 이 워커에서는 시작하지 않음")
+                return
+
             # 현재 이벤트 루프 저장
             self.loop = asyncio.get_running_loop()
             
@@ -178,25 +241,33 @@ class FileWatcherService:
         except Exception as e:
             logger.error(f"파일 시스템 감시 시작 실패: {e}")
             self.is_running = False
+            self._release_watch_lock()
     
     async def stop_watching(self) -> None:
         """파일 시스템 감시 중지"""
         try:
             if not self.is_running or not self.observer:
+                self._release_watch_lock()
                 return
-            
+
+            if self._cleanup_task and not self._cleanup_task.done():
+                self._cleanup_task.cancel()
+            self._cleanup_task = None
+
             self.observer.stop()
             self.observer.join(timeout=5.0)  # 5초 대기
-            
+
             self.observer = None
             self.event_handler = None
             self.loop = None
             self.is_running = False
-            
+
             logger.info("파일 시스템 감시 중지")
-            
+
         except Exception as e:
             logger.error(f"파일 시스템 감시 중지 실패: {e}")
+        finally:
+            self._release_watch_lock()
     
     async def _handle_file_created(self, file_path: Path) -> None:
         """파일 생성 이벤트 처리"""
@@ -239,9 +310,8 @@ class FileWatcherService:
                 except Exception as e:
                     logger.error(f"삭제 콜백 실행 실패: {e}")
             
-            # 썸네일 정리 (비동기로 실행)
-            if self.thumbnail_service:
-                asyncio.create_task(self._cleanup_thumbnails_delayed())
+            # 썸네일 정리 (지연 실행, 진행 중인 정리가 있으면 재사용)
+            self._schedule_cleanup()
             
         except Exception as e:
             logger.error(f"파일 삭제 이벤트 처리 실패: {file_path}, 오류: {e}")
@@ -276,17 +346,33 @@ class FileWatcherService:
         except Exception as e:
             logger.error(f"파일 수정 이벤트 처리 실패: {file_path}, 오류: {e}")
     
+    def _schedule_cleanup(self) -> None:
+        """고아 썸네일 정리를 한 번만 예약한다
+
+        여러 파일이 한꺼번에 삭제되면 삭제 건마다 전체 정리가 돌아 낭비였다.
+        진행 중인 정리 작업이 있으면 새로 만들지 않는다.
+        """
+        if not self.thumbnail_service:
+            return
+
+        if self._cleanup_task and not self._cleanup_task.done():
+            return
+
+        self._cleanup_task = asyncio.create_task(self._cleanup_thumbnails_delayed())
+
     async def _cleanup_thumbnails_delayed(self) -> None:
         """지연된 썸네일 정리 (너무 자주 실행되지 않도록)"""
         try:
-            # 5초 대기 후 정리 (여러 파일이 동시에 삭제될 수 있으므로)
-            await asyncio.sleep(5)
-            
+            # 여러 파일이 동시에 삭제될 수 있으므로 잠시 대기 후 한 번만 정리
+            await asyncio.sleep(CLEANUP_DELAY_SECONDS)
+
             if self.thumbnail_service:
                 deleted_count = await self.thumbnail_service.cleanup_orphaned_thumbnails()
                 if deleted_count > 0:
                     logger.info(f"자동 썸네일 정리 완료: {deleted_count}개 삭제")
-            
+
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(f"자동 썸네일 정리 실패: {e}")
     

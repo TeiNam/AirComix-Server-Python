@@ -102,13 +102,13 @@ COMIX_SERVER_PORT=31257
 COMIX_DEBUG_MODE=false
 COMIX_LOG_LEVEL=INFO
 
-# 파일 필터링 (선택사항)
-COMIX_HIDDEN_FILES=.DS_Store,Thumbs.db,@eaDir
-COMIX_HIDDEN_PATTERNS=__MACOSX,.git
+# 파일 필터링 (선택사항, 목록은 JSON 배열)
+COMIX_HIDDEN_FILES=[".DS_Store", "Thumbs.db", "@eaDir"]
+COMIX_HIDDEN_PATTERNS=["__MACOSX", ".git"]
 
-# 지원 파일 형식 (선택사항)
-COMIX_IMAGE_EXTENSIONS=jpg,jpeg,png,gif,bmp,tif,tiff
-COMIX_ARCHIVE_EXTENSIONS=zip,cbz,rar,cbr
+# 지원 파일 형식 (선택사항, 목록은 JSON 배열)
+COMIX_IMAGE_EXTENSIONS=["jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff"]
+COMIX_ARCHIVE_EXTENSIONS=["zip", "cbz", "rar", "cbr"]
 ```
 
 ### 주요 설정 설명
@@ -240,9 +240,12 @@ export COMIX_DEBUG_MODE=false   # 디버그 모드 비활성화
 ### 대용량 컬렉션
 
 ```bash
-# 파일 캐시 설정 (향후 버전)
-export COMIX_ENABLE_CACHE=true
-export COMIX_CACHE_SIZE=1000
+# 스트리밍 상한과 청크 크기
+export COMIX_MAX_FILE_SIZE=104857600  # 100MB
+export COMIX_CHUNK_SIZE=8192
+
+# 썸네일 캐시를 별도 디스크에 두기 (기본: <manga_directory>/.thumbnails)
+export COMIX_THUMBNAIL_CACHE_DIRECTORY=/var/cache/comix
 ```
 
 ## 🔄 업그레이드

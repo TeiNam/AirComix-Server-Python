@@ -146,3 +146,44 @@ def test_php_compatibility():
     
     converted = EncodingUtils.convert_filename_encoding(euc_kr_bytes)
     assert converted == korean_filename
+
+def test_decode_zip_entry_name_legacy_cp949():
+    """UTF-8 플래그가 없는 ZIP 엔트리는 CP949로 복원한다
+
+    zipfile은 UTF-8 플래그가 없는 파일명을 CP437로 디코딩하므로
+    한국어 압축 파일의 파일명이 깨져서 들어온다.
+    """
+    original = "한글페이지.jpg"
+    # zipfile이 넘겨주는 깨진 형태 재현 (CP949 바이트를 CP437로 디코딩)
+    mojibake = original.encode('cp949').decode('cp437')
+
+    assert mojibake != original
+    assert EncodingUtils.decode_zip_entry_name(mojibake, False) == original
+
+
+def test_decode_zip_entry_name_keeps_utf8_flagged():
+    """UTF-8 플래그가 있으면 파일명을 건드리지 않는다"""
+    assert EncodingUtils.decode_zip_entry_name("한글페이지.jpg", True) == "한글페이지.jpg"
+
+
+def test_decode_zip_entry_name_keeps_ascii():
+    """ASCII 파일명은 변환하지 않는다"""
+    assert EncodingUtils.decode_zip_entry_name("page001.jpg", False) == "page001.jpg"
+    assert EncodingUtils.decode_zip_entry_name("", False) == ""
+
+
+def test_decode_zip_entry_name_preserves_real_cp437_name():
+    """실제 CP437 이름은 망가뜨리지 않는다
+
+    "é.jpg" 처럼 표준 CP437로 기록된 이름을 한국어 인코딩으로 재해석하면
+    제어문자가 되어 파일을 요청할 수 없게 된다.
+    """
+    assert EncodingUtils.decode_zip_entry_name("é.jpg", False) == "é.jpg"
+
+
+def test_is_single_byte_encoding():
+    """항상 성공하는 단일바이트 인코딩을 식별한다"""
+    assert EncodingUtils._is_single_byte_encoding("latin1") is True
+    assert EncodingUtils._is_single_byte_encoding("iso-8859-1") is True
+    assert EncodingUtils._is_single_byte_encoding("cp949") is False
+    assert EncodingUtils._is_single_byte_encoding("euc-kr") is False
