@@ -5,6 +5,13 @@ on:
     branches:
       - main
       - develop
+    # 문서만 바뀌었는데 amd64/arm64 2플랫폼을 빌드할 이유가 없다.
+    # 태그 푸시에는 paths-ignore 가 적용되지 않는다.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'deployment/**'
+      - 'LICENSE'
     tags:
       - 'v*'
   pull_request:
@@ -86,7 +93,6 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
-          type=raw,value=latest,enable={{is_default_branch}}
           type=raw,value=${{ steps.version.outputs.version }},enable=true
         labels: |
           org.opencontainers.image.title=AirComix Server
@@ -113,20 +119,31 @@ jobs:
     - name: Test Docker image
       if: github.event_name != 'pull_request'
       run: |
-        echo "🧪 Docker 이미지 기본 테스트"
-        # 임시 컨테이너로 헬스체크 테스트
+        set -euo pipefail
+        # 방금 푸시한 태그를 검사한다. latest 는 정식 릴리스만 가리키므로 쓰지 않는다.
+        IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+        echo "🧪 이미지 기본 테스트: $IMAGE"
+
         docker run --rm -d --name test-container -p 31259:31257 \
           -e COMIX_MANGA_DIRECTORY=/tmp \
           -e COMIX_DEBUG_MODE=true \
-          ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest || true
-        
-        sleep 10
-        
-        # 헬스체크 테스트
-        curl -f http://localhost:31259/health || echo "Health check failed"
-        
-        # 컨테이너 정리
-        docker stop test-container || true
+          "$IMAGE"
+
+        # 기동 대기. 고정 sleep 대신 준비될 때까지 확인한다.
+        for i in $(seq 1 30); do
+          if curl -sf http://localhost:31259/health > /dev/null; then
+            echo "✅ 헬스체크 통과"
+            curl -s http://localhost:31259/health
+            docker stop test-container > /dev/null
+            exit 0
+          fi
+          sleep 2
+        done
+
+        echo "❌ 헬스체크 실패. 컨테이너 로그:"
+        docker logs test-container || true
+        docker stop test-container > /dev/null || true
+        exit 1
 
     - name: Build development image
       if: github.ref == 'refs/heads/develop'
