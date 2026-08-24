@@ -15,6 +15,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.api.routes import admin_router, router, thumbnail_service
 from app.models.config import settings
 from app.utils.logging import get_logger, setup_logging
@@ -65,7 +66,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Comix Server",
         description="Python port of comix-server for streaming comic books to AirComix iOS app",
-        version="1.0.0",
+        version=__version__,
         lifespan=lifespan,
         debug=settings.debug_mode,
         docs_url="/docs" if settings.debug_mode else None,

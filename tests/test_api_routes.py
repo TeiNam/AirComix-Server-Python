@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
+from app import __version__
 from app.main import create_app
 
 
@@ -105,7 +106,7 @@ class TestApplicationConfiguration:
             
             # FastAPI의 debug 속성 대신 title과 version 확인
             assert app.title == "Comix Server"
-            assert app.version == "1.0.0"
+            assert app.version == __version__
             # 디버그 모드는 미들웨어 설정으로 확인
     
     def test_app_creation_without_debug_mode(self):
@@ -121,7 +122,7 @@ class TestApplicationConfiguration:
             
             # FastAPI의 기본 속성들 확인
             assert app.title == "Comix Server"
-            assert app.version == "1.0.0"
+            assert app.version == __version__
     
     def test_cors_middleware_in_debug_mode(self):
         """디버그 모드에서 CORS 미들웨어 테스트"""
