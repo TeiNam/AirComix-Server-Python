@@ -4,7 +4,7 @@
 FROM python:3.11-slim AS development
 
 # uv 는 버전을 고정해야 빌드가 재현된다
-COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /usr/local/bin/uv
 
 # 메타데이터 라벨
 LABEL maintainer="Comix Server Team" \
@@ -34,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     htop \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+# 베이스 이미지 동봉 pip(24.0)는 노출된 emSign CA 를 신뢰하므로 업그레이드한다
+RUN pip install --no-cache-dir --upgrade "pip>=26.2.2"
 
 # 애플리케이션 디렉토리 생성
 WORKDIR /app
