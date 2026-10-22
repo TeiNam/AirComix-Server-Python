@@ -138,3 +138,7 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.uv]
+# emSign CA 키 노출 대응: 이보다 낮은 uv 는 실행을 거부한다 (setup-uv 도 이 값을 따른다)
+required-version = ">=0.13.4"

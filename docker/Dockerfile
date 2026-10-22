@@ -5,7 +5,7 @@
 FROM python:3.11-slim AS builder
 
 # uv 는 버전을 고정해야 빌드가 재현된다
-COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /usr/local/bin/uv
 
 # 빌드 환경 변수 설정
 # UV_PROJECT_ENVIRONMENT: production 스테이지가 통째로 복사할 venv 경로
@@ -59,6 +59,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+# 베이스 이미지 동봉 pip(24.0)는 노출된 emSign CA 를 신뢰하므로 업그레이드한다
+RUN pip install --no-cache-dir --upgrade "pip>=26.2.2"
 
 # 빌드 스테이지에서 가상환경 복사
 COPY --from=builder /opt/venv /opt/venv
